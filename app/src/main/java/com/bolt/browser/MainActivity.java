@@ -169,7 +169,7 @@ public class MainActivity extends Activity {
                 tab.url=url; if(current()==tab) { address.setText(url.equals(HOME)?"":url); status.setText("Loading…"); }
             }
             @Override public void onPageFinished(WebView view, String url) {
-                tab.url=url; String title=view.getTitle(); if(title!=null && !title.trim().isEmpty()) tab.title=title;
+                tab.url=url; recordHistory(url); String title=view.getTitle(); if(title!=null && !title.trim().isEmpty()) tab.title=title;
                 if(current()==tab) { address.setText(url.equals(HOME)?"":url); status.setText(tab.title); }
                 refreshTabs();
             }
