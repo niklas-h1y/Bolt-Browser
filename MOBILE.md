@@ -1,27 +1,28 @@
 # Bolt Browser on mobile
 
-The repository now contains a mobile companion at `mobile/`. It is a small installable PWA and can also be wrapped as a native Android/iOS app with Capacitor.
+The repository includes a mobile companion at `mobile/`. It can be installed as a Progressive Web App (PWA), or wrapped as a native Android/iOS app with Capacitor.
 
-## Install without compiling
+## Install the PWA
 
-Deploy the repository's `mobile/` directory to any HTTPS static host (or publish the project and visit its `/mobile/` path). Then:
+Deploy the contents of the `mobile/` directory to an HTTPS static host, then open the deployed page on your phone:
 
-- **Android:** open the mobile page in Chrome and choose **Install app** or **Add to Home screen**.
-- **iPhone/iPad:** open the page in Safari, tap **Share**, then **Add to Home Screen**.
+- **Android:** open it in Chrome and choose **Install app** or **Add to Home screen**.
+- **iPhone/iPad:** open it in Safari, tap **Share**, then **Add to Home Screen**.
 
-The PWA is a lightweight mobile companion and start page, not a full native browser engine. Browsing arbitrary sites from an installed web app is subject to the host browser's rules and sites may prevent embedding.
+This mobile companion is a lightweight installable start page, not yet a full-featured mobile browser. Arbitrary sites may restrict navigation or embedding in installed web apps.
 
 ## Build a native Android app
 
-Install Node.js and Android Studio, then from the repository root:
+Install Node.js 20+ and Android Studio. From the repository root:
 
 ```bash
 npm install
+npm run mobile:add:android
 npm run mobile:sync
 npx cap open android
 ```
 
-In Android Studio, build an APK or generate a signed app bundle (AAB) for Google Play. Android's System WebView is Chromium-based. This wrapper does not provide desktop Chrome extension compatibility.
+In Android Studio, build an APK for direct installation or generate a signed AAB for Google Play. The app uses Android System WebView, which is Chromium-based.
 
 ## Build for iOS
 
@@ -29,13 +30,16 @@ On macOS with Xcode installed:
 
 ```bash
 npm install
-npx cap add ios
+npm run mobile:add:ios
 npm run mobile:sync
 npx cap open ios
 ```
 
 Build and sign the app in Xcode. iOS apps use Apple's WebKit engine, not Chromium.
 
-## Desktop remains separate
+## Mobile limitations
 
-Run the full Chromium desktop browser with `npm start`. Desktop extension loading is available in the desktop app; mobile extension support is not included.
+- The mobile companion does not currently have desktop-style tabs, full browser controls, or Chromium extension installation.
+- Desktop extensions do not automatically work in Android WebView or iOS WebKit.
+- Android WebView is Chromium-derived, but it is not the same as shipping the full desktop Chromium browser.
+- For a production mobile browser, a dedicated native navigation/tab layer, downloads handling, permissions, and privacy controls still need to be implemented and tested.
