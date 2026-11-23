@@ -2,26 +2,18 @@ package com.bolt.browser;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.DownloadManager;
-import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.webkit.DownloadListener;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
+import android.content.Context;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -31,10 +23,22 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.mozilla.geckoview.AllowOrDeny;
+import org.mozilla.geckoview.GeckoResult;
+import org.mozilla.geckoview.GeckoRuntime;
+import org.mozilla.geckoview.GeckoSession;
+import org.mozilla.geckoview.GeckoView;
+import org.mozilla.geckoview.WebExtension;
+import org.mozilla.geckoview.WebExtensionController;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends Activity {
@@ -44,18 +48,20 @@ public class MainActivity extends Activity {
     private static final int TEXT = Color.rgb(242,244,237);
     private static final int MUTED = Color.rgb(146,152,140);
     private static final int ACCENT = Color.rgb(184,243,107);
-    private static final String HOME = "file:///android_asset/index.html";
+    private static final String HOME = "resource://android/assets/index.html";
+    private static final int PICK_EXTENSION = 4102;
 
+    private static GeckoRuntime runtime;
     private LinearLayout root, tabsBar;
     private FrameLayout webHost;
     private EditText address;
-    private TextView status, tabCount;
-    private boolean javascriptEnabled = true;
+    private TextView status;
     private final ArrayList<Tab> tabs = new ArrayList<>();
     private int active = -1;
 
     private static class Tab {
-        WebView web;
+        GeckoSession session;
+        GeckoView view;
         String title = "New tab";
         String url = HOME;
     }
@@ -64,8 +70,9 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+        if (runtime == null) runtime = GeckoRuntime.create(this);
+        configureExtensionPrompts();
         buildChrome();
-        javascriptEnabled = getPreferences(MODE_PRIVATE).getBoolean("javascript", true);
         addTab(HOME);
     }
 
@@ -94,16 +101,12 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(BG);
         setContentView(root);
 
-        // Chrome-style top toolbar: the address bar is the first browser control
-        // directly below Android's status bar, always visible while browsing.
         LinearLayout addressRow = new LinearLayout(this);
         addressRow.setGravity(Gravity.CENTER_VERTICAL);
         addressRow.setPadding(dp(8), dp(6), dp(8), dp(6));
         addressRow.setBackgroundColor(BG);
 
-        TextView siteIcon = label("◈", 17, ACCENT);
-        addressRow.addView(siteIcon, new LinearLayout.LayoutParams(dp(30), dp(44)));
-
+        addressRow.addView(label("◈", 17, ACCENT), new LinearLayout.LayoutParams(dp(30), dp(44)));
         address = new EditText(this);
         address.setSingleLine(true);
         address.setTextSize(14);
@@ -121,7 +124,7 @@ public class MainActivity extends Activity {
         address.setBackground(addressBg);
         addressRow.addView(address, new LinearLayout.LayoutParams(0, dp(44), 1));
 
-        Button tabSwitcher = button(String.valueOf(Math.max(1, tabs.size())), false);
+        Button tabSwitcher = button("1", false);
         tabSwitcher.setTextSize(12);
         tabSwitcher.setOnClickListener(v -> showTabPicker());
         LinearLayout.LayoutParams tabLp = new LinearLayout.LayoutParams(dp(42), dp(42));
@@ -156,23 +159,16 @@ public class MainActivity extends Activity {
         bottom.setGravity(Gravity.CENTER_VERTICAL);
         bottom.setPadding(dp(6), dp(4), dp(6), dp(4));
         bottom.setBackgroundColor(PANEL);
-
-        Button back = button("‹", false);
-        back.setTextSize(23);
-        back.setOnClickListener(v -> { if(current()!=null && current().web.canGoBack()) current().web.goBack(); });
-        Button forward = button("›", false);
-        forward.setTextSize(23);
-        forward.setOnClickListener(v -> { if(current()!=null && current().web.canGoForward()) current().web.goForward(); });
-        Button home = button("⌂", false);
-        home.setTextSize(20);
+        Button back = button("‹", false); back.setTextSize(23);
+        back.setOnClickListener(v -> { if(current()!=null) current().session.goBack(); });
+        Button forward = button("›", false); forward.setTextSize(23);
+        forward.setOnClickListener(v -> { if(current()!=null) current().session.goForward(); });
+        Button home = button("⌂", false); home.setTextSize(20);
         home.setOnClickListener(v -> load(HOME));
-        Button reload = button("↻", false);
-        reload.setTextSize(20);
-        reload.setOnClickListener(v -> { if(current()!=null) current().web.reload(); });
-        Button bookmark = button("☆", false);
-        bookmark.setTextSize(19);
+        Button reload = button("↻", false); reload.setTextSize(20);
+        reload.setOnClickListener(v -> { if(current()!=null) current().session.reload(); });
+        Button bookmark = button("☆", false); bookmark.setTextSize(19);
         bookmark.setOnClickListener(v -> saveBookmark());
-
         bottom.addView(back, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(forward, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(home, new LinearLayout.LayoutParams(0, dp(44), 1));
@@ -187,81 +183,50 @@ public class MainActivity extends Activity {
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(20)));
     }
 
-    private void showTabPicker() {
-        if (tabs.isEmpty()) return;
-        String[] names = new String[tabs.size() + 1];
-        for (int i = 0; i < tabs.size(); i++) names[i] = (i == active ? "✓ " : "") + shortTitle(tabs.get(i).title);
-        names[tabs.size()] = "+ New tab";
-        new AlertDialog.Builder(this).setTitle("Tabs")
-            .setItems(names, (dialog, which) -> {
-                if (which == tabs.size()) addTab(HOME);
-                else selectTab(which);
-            }).show();
-    }
-
     private Tab current() { return active >= 0 && active < tabs.size() ? tabs.get(active) : null; }
 
     private void addTab(String url) {
         Tab tab = new Tab();
-        WebView web = new WebView(this); tab.web = web;
-        WebSettings settings = web.getSettings();
-        settings.setJavaScriptEnabled(javascriptEnabled); settings.setDomStorageEnabled(true);
-        settings.setSupportZoom(true); settings.setBuiltInZoomControls(true); settings.setDisplayZoomControls(false);
-        settings.setJavaScriptCanOpenWindowsAutomatically(true); settings.setSupportMultipleWindows(true);
-        settings.setLoadWithOverviewMode(true); settings.setUseWideViewPort(true);
-        web.setBackgroundColor(BG);
-        web.setWebViewClient(new WebViewClient() {
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                Uri uri = request.getUrl();
-                String scheme = uri.getScheme()==null ? "" : uri.getScheme();
-                if (scheme.equals("http") || scheme.equals("https") || scheme.equals("file") || scheme.equals("about")) return false;
-                try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch(Exception ignored) {}
-                return true;
-            }
-            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                tab.url=url; if(current()==tab) { address.setText(url.equals(HOME)?"":url); status.setText("Loading…"); }
-            }
-            @Override public void onPageFinished(WebView view, String url) {
-                tab.url=url; recordHistory(url); String title=view.getTitle(); if(title!=null && !title.trim().isEmpty()) tab.title=title;
-                if(current()==tab) { address.setText(url.equals(HOME)?"":url); status.setText(tab.title); }
-                refreshTabs();
+        tab.session = new GeckoSession();
+        tab.view = new GeckoView(this);
+        tab.session.open(runtime);
+        tab.view.setSession(tab.session);
+        tab.session.setContentDelegate(new GeckoSession.ContentDelegate() {
+            @Override public void onTitleChange(GeckoSession session, String title) {
+                if (title != null && !title.trim().isEmpty()) tab.title = title;
+                runOnUiThread(() -> refreshTabs());
             }
         });
-        web.setWebChromeClient(new WebChromeClient() {
-            @Override public void onReceivedTitle(WebView view, String title) {
-                if(title!=null && !title.trim().isEmpty()) tab.title=title;
-                refreshTabs();
+        tab.session.setProgressDelegate(new GeckoSession.ProgressDelegate() {
+            @Override public void onPageStart(GeckoSession session, String pageUrl) {
+                tab.url = pageUrl;
+                runOnUiThread(() -> {
+                    if (current() == tab) { address.setText(pageUrl.equals(HOME) ? "" : pageUrl); status.setText("Loading…"); }
+                });
             }
-            @Override public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
-                addTab("about:blank");
-                WebView.WebViewTransport transport=(WebView.WebViewTransport)resultMsg.obj;
-                transport.setWebView(current().web);
-                resultMsg.sendToTarget();
-                return true;
+            @Override public void onPageStop(GeckoSession session, boolean success) {
+                if (tab.url != null && tab.url.startsWith("http")) recordHistory(tab.url);
+                runOnUiThread(() -> {
+                    if (current() == tab) { address.setText(tab.url.equals(HOME) ? "" : tab.url); status.setText(tab.title); }
+                    refreshTabs();
+                });
             }
         });
-        web.setDownloadListener((downloadUrl, userAgent, contentDisposition, mimeType, contentLength) -> {
-            try {
-                DownloadManager.Request request=new DownloadManager.Request(Uri.parse(downloadUrl));
-                request.setMimeType(mimeType);
-                request.addRequestHeader("User-Agent", userAgent);
-                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, android.webkit.URLUtil.guessFileName(downloadUrl,contentDisposition,mimeType));
-                ((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
-                Toast.makeText(this,"Download started",Toast.LENGTH_SHORT).show();
-            } catch(Exception ex) { Toast.makeText(this,"Could not start download",Toast.LENGTH_LONG).show(); }
-        });
-        tabs.add(tab); active=tabs.size()-1;
-        webHost.addView(web, new FrameLayout.LayoutParams(-1,-1));
-        web.loadUrl(url);
+
+        tabs.add(tab);
+        active = tabs.size()-1;
+        webHost.addView(tab.view, new FrameLayout.LayoutParams(-1,-1));
+        tab.session.loadUri(url);
         selectTab(active);
     }
 
     private void selectTab(int index) {
         if(index<0 || index>=tabs.size()) return;
+        if (current() != null) runtime.getWebExtensionController().setTabActive(current().session, false);
         active=index;
-        for(int i=0;i<tabs.size();i++) tabs.get(i).web.setVisibility(i==active?View.VISIBLE:View.GONE);
+        for(int i=0;i<tabs.size();i++) tabs.get(i).view.setVisibility(i==active?View.VISIBLE:View.GONE);
         Tab tab=current();
+        runtime.getWebExtensionController().setTabActive(tab.session, true);
         address.setText(tab.url.equals(HOME) || tab.url.equals("about:blank") ? "" : tab.url);
         status.setText(tab.title);
         refreshTabs();
@@ -284,14 +249,11 @@ public class MainActivity extends Activity {
 
     private void updateTabSwitcher() {
         if (root == null || root.getChildCount() == 0) return;
-        View first = root.getChildAt(0);
-        if (!(first instanceof LinearLayout)) return;
-        LinearLayout row = (LinearLayout) first;
-        for (int j = 0; j < row.getChildCount(); j++) {
-            View item = row.getChildAt(j);
-            if (item instanceof Button && ((Button)item).getText().toString().matches("[0-9]+")) {
-                ((Button)item).setText(String.valueOf(Math.max(1, tabs.size())));
-                return;
+        LinearLayout row = (LinearLayout) root.getChildAt(0);
+        for (int j=0;j<row.getChildCount();j++) {
+            View item=row.getChildAt(j);
+            if(item instanceof Button && ((Button)item).getText().toString().matches("[0-9]+")) {
+                ((Button)item).setText(String.valueOf(Math.max(1,tabs.size()))); return;
             }
         }
     }
@@ -300,14 +262,15 @@ public class MainActivity extends Activity {
 
     private void load(String url) {
         if(current()==null) { addTab(url); return; }
-        current().web.loadUrl(url);
+        current().url=url;
+        current().session.loadUri(url);
     }
 
     private void navigateFromAddress() {
         String value=address.getText().toString().trim();
         if(value.isEmpty()) return;
         String url=value;
-        if(!url.matches("(?i)^(https?://|file:|about:).*")) {
+        if(!url.matches("(?i)^(https?://|file:|about:|resource:).*")) {
             if(url.matches("(?i)^([a-z0-9-]+\\.)+[a-z]{2,}(:[0-9]+)?(/.*)?$") || url.startsWith("localhost")) url="https://"+url;
             else {
                 try { url="https://www.google.com/search?q="+URLEncoder.encode(url,"UTF-8"); }
@@ -327,50 +290,124 @@ public class MainActivity extends Activity {
         Toast.makeText(this,"Bookmark saved",Toast.LENGTH_SHORT).show();
     }
 
+    private void showTabPicker() {
+        if(tabs.isEmpty()) return;
+        String[] names=new String[tabs.size()+1];
+        for(int i=0;i<tabs.size();i++) names[i]=(i==active?"✓ ":"")+shortTitle(tabs.get(i).title);
+        names[tabs.size()]="+ New tab";
+        new AlertDialog.Builder(this).setTitle("Tabs").setItems(names,(d,which)->{
+            if(which==tabs.size()) addTab(HOME); else selectTab(which);
+        }).show();
+    }
+
     private void showMenu(View anchor) {
         PopupMenu menu=new PopupMenu(this,anchor);
         menu.getMenu().add("New tab").setOnMenuItemClickListener(item->{addTab(HOME);return true;});
         menu.getMenu().add("Bookmarks").setOnMenuItemClickListener(item->{showSaved("bookmarks");return true;});
         menu.getMenu().add("History").setOnMenuItemClickListener(item->{showSaved("history");return true;});
-        menu.getMenu().add("Downloads").setOnMenuItemClickListener(item->{openDownloads();return true;});
-        menu.getMenu().add("Extensions").setOnMenuItemClickListener(item->{showExtensionsInfo();return true;});
+        menu.getMenu().add("Extensions").setOnMenuItemClickListener(item->{showExtensions();return true;});
+        menu.getMenu().add("Install extension (.xpi)").setOnMenuItemClickListener(item->{pickExtension();return true;});
         menu.getMenu().add("Settings").setOnMenuItemClickListener(item->{showSettings();return true;});
         menu.getMenu().add("Close current tab").setOnMenuItemClickListener(item->{closeCurrentTab();return true;});
-        menu.getMenu().add("About Bolt").setOnMenuItemClickListener(item->{new AlertDialog.Builder(this).setTitle("Bolt Browser").setMessage("Android edition · Chromium-based Android System WebView").setPositiveButton("OK",null).show();return true;});
+        menu.getMenu().add("About Bolt").setOnMenuItemClickListener(item->{new AlertDialog.Builder(this).setTitle("Bolt Browser").setMessage("Android edition · GeckoView (Firefox engine)").setPositiveButton("OK",null).show();return true;});
         menu.show();
     }
 
-    private void openDownloads() {
-        try { startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)); }
-        catch(Exception ex) { Toast.makeText(this,"Open the Downloads app to view saved files",Toast.LENGTH_LONG).show(); }
+    private void configureExtensionPrompts() {
+        runtime.getWebExtensionController().setPromptDelegate(new WebExtensionController.PromptDelegate() {
+            @Override public GeckoResult<WebExtension.PermissionPromptResponse> onInstallPromptRequest(
+                    WebExtension extension, String[] permissions, String[] origins, String[] dataPermissions) {
+                GeckoResult<WebExtension.PermissionPromptResponse> result = new GeckoResult<>();
+                runOnUiThread(() -> new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Install extension?")
+                    .setMessage("This add-on requests:\n" + permissionText(permissions, origins, dataPermissions) + "\n\nOnly install add-ons you trust.")
+                    .setNegativeButton("Cancel", (d,w) -> result.complete(new WebExtension.PermissionPromptResponse(false,false,false)))
+                    .setPositiveButton("Allow", (d,w) -> result.complete(new WebExtension.PermissionPromptResponse(true,false,false)))
+                    .setOnCancelListener(d -> result.complete(new WebExtension.PermissionPromptResponse(false,false,false)))
+                    .show());
+                return result;
+            }
+            @Override public GeckoResult<AllowOrDeny> onOptionalPrompt(WebExtension extension, String[] permissions, String[] origins, String[] dataPermissions) {
+                return GeckoResult.fromValue(AllowOrDeny.DENY);
+            }
+            @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension extension, String[] permissions, String[] origins, String[] dataPermissions) {
+                return GeckoResult.fromValue(AllowOrDeny.DENY);
+            }
+        });
     }
 
-    private void showExtensionsInfo() {
-        new AlertDialog.Builder(this).setTitle("Bolt extensions")
-            .setMessage("Android WebView does not include the Chrome extension runtime. The /extensions folder in the Bolt GitHub project contains Manifest V3 extensions for the desktop Electron build. Android extension support needs a separate compatible runtime; desktop extensions cannot simply be copied into WebView.")
-            .setPositiveButton("OK",null).show();
+    private String permissionText(String[] permissions, String[] origins, String[] data) {
+        StringBuilder b=new StringBuilder();
+        for(String p:permissions) b.append("• ").append(p).append('\n');
+        for(String o:origins) b.append("• Site access: ").append(o).append('\n');
+        for(String d:data) b.append("• Data: ").append(d).append('\n');
+        return b.length()==0 ? "No additional permissions listed." : b.toString();
+    }
+
+    private void pickExtension() {
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("application/x-xpinstall");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent,PICK_EXTENSION);
+    }
+
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data) {
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode!=PICK_EXTENSION || resultCode!=RESULT_OK || data==null || data.getData()==null) return;
+        Uri selected=data.getData();
+        try {
+            File target=new File(getCacheDir(),"bolt-addon-"+System.currentTimeMillis()+".xpi");
+            try(InputStream in=getContentResolver().openInputStream(selected);
+                FileOutputStream out=new FileOutputStream(target)) {
+                byte[] buffer=new byte[8192]; int n;
+                while((n=in.read(buffer))>0) out.write(buffer,0,n);
+            }
+            runtime.getWebExtensionController().install(Uri.fromFile(target).toString(), WebExtensionController.INSTALLATION_METHOD_FROM_FILE)
+                .accept(extension -> runOnUiThread(() -> {
+                    Toast.makeText(this,"Extension installed: "+extension.metaData.name,Toast.LENGTH_LONG).show();
+                }), error -> runOnUiThread(() ->
+                    new AlertDialog.Builder(this).setTitle("Extension not installed")
+                        .setMessage(error.getMessage()+"\n\nGeckoView requires Mozilla-signed XPI packages. Unpacked folders and unsigned ZIPs are not installable this way.")
+                        .setPositiveButton("OK",null).show()));
+        } catch(Exception e) {
+            Toast.makeText(this,"Could not read extension file: "+e.getMessage(),Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showExtensions() {
+        runtime.getWebExtensionController().list().accept(extensions -> runOnUiThread(() -> {
+            if(extensions.isEmpty()) {
+                new AlertDialog.Builder(this).setTitle("Bolt extensions")
+                    .setMessage("No extensions installed yet. Use “Install extension (.xpi)” to add a Mozilla-signed WebExtension package.")
+                    .setPositiveButton("OK",null).show();
+                return;
+            }
+            String[] names=new String[extensions.size()];
+            for(int i=0;i<extensions.size();i++) names[i]=extensions.get(i).metaData.name;
+            new AlertDialog.Builder(this).setTitle("Installed extensions")
+                .setItems(names,(d,which)->new AlertDialog.Builder(this)
+                    .setTitle(names[which]).setMessage("Manage this add-on?")
+                    .setNegativeButton("Close",null)
+                    .setPositiveButton("Uninstall",(dialog,whichButton)->runtime.getWebExtensionController().uninstall(extensions.get(which)))
+                    .show()).setPositiveButton("Done",null).show();
+        }), error -> runOnUiThread(() -> Toast.makeText(this,"Could not load extensions",Toast.LENGTH_SHORT).show()));
     }
 
     private void showSettings() {
-        String[] options = {"Enable JavaScript", "Clear browsing history", "Clear website data"};
-        boolean[] checked = {javascriptEnabled, false, false};
-        new AlertDialog.Builder(this).setTitle("Settings")
-            .setMultiChoiceItems(options, checked, (dialog, which, isChecked) -> {
-                if (which == 0) {
-                    javascriptEnabled = isChecked;
-                    for (Tab tab : tabs) tab.web.getSettings().setJavaScriptEnabled(javascriptEnabled);
-                    getPreferences(MODE_PRIVATE).edit().putBoolean("javascript", javascriptEnabled).apply();
-                }
-            })
-            .setNeutralButton("Clear history", (dialog, which) -> getPreferences(MODE_PRIVATE).edit().remove("history").apply())
-            .setPositiveButton("Done",null).show();
+        String[] options={"Clear browsing history","Clear bookmarks"};
+        new AlertDialog.Builder(this).setTitle("Settings").setItems(options,(d,which)->{
+            if(which==0) getPreferences(MODE_PRIVATE).edit().remove("history").apply();
+            else getPreferences(MODE_PRIVATE).edit().remove("bookmarks").apply();
+            Toast.makeText(this,"Done",Toast.LENGTH_SHORT).show();
+        }).setNegativeButton("Close",null).show();
     }
 
     private void showSaved(String key) {
         Set<String> values=getPreferences(MODE_PRIVATE).getStringSet(key,new HashSet<>());
         ArrayList<String> list=new ArrayList<>(values); Collections.reverse(list);
         if(list.isEmpty()) { Toast.makeText(this,key.equals("history")?"No history yet":"No bookmarks yet",Toast.LENGTH_SHORT).show(); return; }
-        new AlertDialog.Builder(this).setTitle(key.equals("history")?"History":"Bookmarks").setItems(list.toArray(new String[0]),(d,which)->load(list.get(which))).setNegativeButton("Close",null).show();
+        new AlertDialog.Builder(this).setTitle(key.equals("history")?"History":"Bookmarks")
+            .setItems(list.toArray(new String[0]),(d,which)->load(list.get(which))).setNegativeButton("Close",null).show();
     }
 
     private void recordHistory(String url) {
@@ -382,19 +419,25 @@ public class MainActivity extends Activity {
 
     private void closeCurrentTab() {
         if(tabs.size()<=1) { load(HOME); return; }
-        Tab removed=tabs.remove(active); webHost.removeView(removed.web); removed.web.stopLoading(); removed.web.destroy();
-        active=Math.max(0,active-1); selectTab(active);
+        Tab removed=tabs.remove(active);
+        webHost.removeView(removed.view);
+        removed.view.releaseSession();
+        removed.session.close();
+        active=Math.max(0,active-1);
+        selectTab(active);
     }
 
     @Override public void onBackPressed() {
-        Tab tab=current();
-        if(tab!=null && tab.web.canGoBack()) tab.web.goBack();
-        else if(tabs.size()>1) closeCurrentTab();
+        if(tabs.size()>1) closeCurrentTab();
         else load(HOME);
     }
 
     @Override protected void onDestroy() {
-        for(Tab tab:tabs) { tab.web.stopLoading(); tab.web.destroy(); }
-        tabs.clear(); super.onDestroy();
+        for(Tab tab:tabs) {
+            tab.view.releaseSession();
+            tab.session.close();
+        }
+        tabs.clear();
+        super.onDestroy();
     }
 }
