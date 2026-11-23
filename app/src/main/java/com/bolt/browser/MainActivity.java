@@ -187,13 +187,13 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
-        web.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+        web.setDownloadListener((downloadUrl, userAgent, contentDisposition, mimeType, contentLength) -> {
             try {
-                DownloadManager.Request request=new DownloadManager.Request(Uri.parse(url));
+                DownloadManager.Request request=new DownloadManager.Request(Uri.parse(downloadUrl));
                 request.setMimeType(mimeType);
                 request.addRequestHeader("User-Agent", userAgent);
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, android.webkit.URLUtil.guessFileName(url,contentDisposition,mimeType));
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, android.webkit.URLUtil.guessFileName(downloadUrl,contentDisposition,mimeType));
                 ((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(request);
                 Toast.makeText(this,"Download started",Toast.LENGTH_SHORT).show();
             } catch(Exception ex) { Toast.makeText(this,"Could not start download",Toast.LENGTH_LONG).show(); }
