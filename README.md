@@ -1,5 +1,5 @@
 # ⚡ Bolt Browser
-[![Download Android APK](https://github.com)
+[Download Android APK](https://github.com)
 Bolt Browser has a desktop Electron browser, an Android browser, and a lightweight hosted start page.
 
 - **Desktop:** Electron + Chromium, tabs, downloads and Manifest V3 extension loading.
