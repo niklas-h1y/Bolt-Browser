@@ -89,69 +89,114 @@ public class MainActivity extends Activity {
     }
 
     private void buildChrome() {
-        root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(BG);
         setContentView(root);
 
-        LinearLayout brand = new LinearLayout(this);
-        brand.setGravity(Gravity.CENTER_VERTICAL); brand.setPadding(dp(14), dp(5), dp(12), dp(3));
-        TextView bolt = label("ϟ", 19, Color.rgb(23,32,13));
-        bolt.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ACCENT));
-        bolt.setBackgroundColor(ACCENT);
-        brand.addView(bolt, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        TextView name = label("Bolt Browser", 16, TEXT); name.setGravity(Gravity.CENTER_VERTICAL);
-        name.setTypeface(null, 1); brand.addView(name);
-        TextView engine = label("ANDROID", 10, MUTED); brand.addView(engine);
-        root.addView(brand, new LinearLayout.LayoutParams(-1, dp(42)));
+        // Chrome-style top toolbar: the address bar is the first browser control
+        // directly below Android's status bar, always visible while browsing.
+        LinearLayout addressRow = new LinearLayout(this);
+        addressRow.setGravity(Gravity.CENTER_VERTICAL);
+        addressRow.setPadding(dp(8), dp(6), dp(8), dp(6));
+        addressRow.setBackgroundColor(BG);
+
+        TextView siteIcon = label("◈", 17, ACCENT);
+        addressRow.addView(siteIcon, new LinearLayout.LayoutParams(dp(30), dp(44)));
+
+        address = new EditText(this);
+        address.setSingleLine(true);
+        address.setTextSize(14);
+        address.setTextColor(TEXT);
+        address.setHintTextColor(MUTED);
+        address.setHint("Search or enter address");
+        address.setImeOptions(EditorInfo.IME_ACTION_GO);
+        address.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        address.setPadding(dp(12), 0, dp(8), 0);
+        address.setSelectAllOnFocus(true);
+        GradientDrawable addressBg = new GradientDrawable();
+        addressBg.setColor(PANEL2);
+        addressBg.setCornerRadius(dp(22));
+        addressBg.setStroke(dp(1), Color.rgb(55,60,51));
+        address.setBackground(addressBg);
+        addressRow.addView(address, new LinearLayout.LayoutParams(0, dp(44), 1));
+
+        Button tabSwitcher = button(String.valueOf(Math.max(1, tabs.size())), false);
+        tabSwitcher.setTextSize(12);
+        tabSwitcher.setOnClickListener(v -> showTabPicker());
+        LinearLayout.LayoutParams tabLp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        tabLp.leftMargin = dp(5);
+        addressRow.addView(tabSwitcher, tabLp);
+
+        Button topMenu = button("⋮", false);
+        topMenu.setTextSize(20);
+        topMenu.setOnClickListener(v -> showMenu(topMenu));
+        addressRow.addView(topMenu, new LinearLayout.LayoutParams(dp(40), dp(42)));
+
+        address.setOnEditorActionListener((v, action, event) -> {
+            if(action==EditorInfo.IME_ACTION_GO || (event!=null && event.getKeyCode()==KeyEvent.KEYCODE_ENTER)) {
+                navigateFromAddress(); return true;
+            }
+            return false;
+        });
+        root.addView(addressRow, new LinearLayout.LayoutParams(-1, dp(56)));
 
         HorizontalScrollView tabScroll = new HorizontalScrollView(this);
         tabScroll.setHorizontalScrollBarEnabled(false);
-        tabsBar = new LinearLayout(this); tabsBar.setOrientation(LinearLayout.HORIZONTAL);
+        tabsBar = new LinearLayout(this);
+        tabsBar.setOrientation(LinearLayout.HORIZONTAL);
         tabsBar.setPadding(dp(8), 0, dp(8), dp(4));
         tabScroll.addView(tabsBar);
         root.addView(tabScroll, new LinearLayout.LayoutParams(-1, dp(40)));
-
-        LinearLayout nav = new LinearLayout(this);
-        nav.setGravity(Gravity.CENTER_VERTICAL); nav.setPadding(dp(7), dp(4), dp(7), dp(4));
-        Button back = button("‹", false); back.setOnClickListener(v -> { if (current()!=null && current().web.canGoBack()) current().web.goBack(); });
-        Button forward = button("›", false); forward.setOnClickListener(v -> { if (current()!=null && current().web.canGoForward()) current().web.goForward(); });
-        Button reload = button("↻", false); reload.setOnClickListener(v -> { if(current()!=null) current().web.reload(); });
-        Button home = button("⌂", false); home.setOnClickListener(v -> load(HOME));
-        nav.addView(back); nav.addView(forward); nav.addView(reload); nav.addView(home);
-        root.addView(nav, new LinearLayout.LayoutParams(-1, dp(43)));
-
-        LinearLayout addressRow = new LinearLayout(this);
-        addressRow.setGravity(Gravity.CENTER_VERTICAL); addressRow.setPadding(dp(9), dp(2), dp(9), dp(7));
-        address = new EditText(this); address.setSingleLine(true); address.setTextSize(14);
-        address.setTextColor(TEXT); address.setHintTextColor(MUTED); address.setHint("Search or enter website");
-        address.setImeOptions(EditorInfo.IME_ACTION_GO); address.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        address.setPadding(dp(13), 0, dp(10), 0);
-        GradientDrawable addressBg = new GradientDrawable();
-        addressBg.setColor(PANEL2); addressBg.setCornerRadius(dp(13));
-        addressBg.setStroke(dp(1), Color.rgb(48,52,45));
-        address.setBackground(addressBg); address.setHintTextColor(MUTED);
-        address.setTextColor(TEXT); address.setSelectAllOnFocus(true);
-        address.setSelectAllOnFocus(true);
-        addressRow.addView(address, new LinearLayout.LayoutParams(0, dp(43), 1));
-        Button go = button("Go", true); go.setOnClickListener(v -> navigateFromAddress());
-        LinearLayout.LayoutParams goLp = new LinearLayout.LayoutParams(dp(62), dp(43)); goLp.leftMargin = dp(7);
-        addressRow.addView(go, goLp);
-        address.setOnEditorActionListener((v, action, event) -> {
-            if(action==EditorInfo.IME_ACTION_GO || (event!=null && event.getKeyCode()==KeyEvent.KEYCODE_ENTER)) { navigateFromAddress(); return true; }
-            return false;
-        });
-        root.addView(addressRow);
 
         webHost = new FrameLayout(this);
         root.addView(webHost, new LinearLayout.LayoutParams(-1, 0, 1));
 
         LinearLayout bottom = new LinearLayout(this);
-        bottom.setGravity(Gravity.CENTER_VERTICAL); bottom.setPadding(dp(12), 0, dp(8), 0); bottom.setBackgroundColor(PANEL);
-        status = label("Ready · Chromium WebView", 10, MUTED); status.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-        bottom.addView(status, new LinearLayout.LayoutParams(0, dp(27), 1));
-        Button bookmark = button("☆", false); bookmark.setOnClickListener(v -> saveBookmark());
-        Button menu = button("•••", false); menu.setOnClickListener(v -> showMenu(menu));
-        bottom.addView(bookmark); bottom.addView(menu);
-        root.addView(bottom);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        bottom.setPadding(dp(6), dp(4), dp(6), dp(4));
+        bottom.setBackgroundColor(PANEL);
+
+        Button back = button("‹", false);
+        back.setTextSize(23);
+        back.setOnClickListener(v -> { if(current()!=null && current().web.canGoBack()) current().web.goBack(); });
+        Button forward = button("›", false);
+        forward.setTextSize(23);
+        forward.setOnClickListener(v -> { if(current()!=null && current().web.canGoForward()) current().web.goForward(); });
+        Button home = button("⌂", false);
+        home.setTextSize(20);
+        home.setOnClickListener(v -> load(HOME));
+        Button reload = button("↻", false);
+        reload.setTextSize(20);
+        reload.setOnClickListener(v -> { if(current()!=null) current().web.reload(); });
+        Button bookmark = button("☆", false);
+        bookmark.setTextSize(19);
+        bookmark.setOnClickListener(v -> saveBookmark());
+
+        bottom.addView(back, new LinearLayout.LayoutParams(0, dp(44), 1));
+        bottom.addView(forward, new LinearLayout.LayoutParams(0, dp(44), 1));
+        bottom.addView(home, new LinearLayout.LayoutParams(0, dp(44), 1));
+        bottom.addView(reload, new LinearLayout.LayoutParams(0, dp(44), 1));
+        bottom.addView(bookmark, new LinearLayout.LayoutParams(0, dp(44), 1));
+        root.addView(bottom, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        status = label("Ready · Bolt Browser", 10, MUTED);
+        status.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        status.setPadding(dp(12), 0, dp(12), 0);
+        status.setBackgroundColor(PANEL);
+        root.addView(status, new LinearLayout.LayoutParams(-1, dp(20)));
+    }
+
+    private void showTabPicker() {
+        if (tabs.isEmpty()) return;
+        String[] names = new String[tabs.size() + 1];
+        for (int i = 0; i < tabs.size(); i++) names[i] = (i == active ? "✓ " : "") + shortTitle(tabs.get(i).title);
+        names[tabs.size()] = "+ New tab";
+        new AlertDialog.Builder(this).setTitle("Tabs")
+            .setItems(names, (dialog, which) -> {
+                if (which == tabs.size()) addTab(HOME);
+                else selectTab(which);
+            }).show();
     }
 
     private Tab current() { return active >= 0 && active < tabs.size() ? tabs.get(active) : null; }
