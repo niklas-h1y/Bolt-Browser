@@ -1,14 +1,14 @@
 {
-  "id": "/Roblox-Studio-App/",
-  "name": "Roblox Studio App",
-  "short_name": "Roblox Studio",
-  "description": "Roblox Studio App",
-  "start_url": "/Roblox-Studio-App/",
-  "scope": "/Roblox-Studio-App/",
+  "id": "./",
+  "name": "Bolt Browser",
+  "short_name": "Bolt",
+  "description": "A clean, lightweight browser experience for the web.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "orientation": "landscape",
-  "background_color": "#0C0E12",
-  "theme_color": "#00E676",
+  "orientation": "any",
+  "background_color": "#10131b",
+  "theme_color": "#10131b",
   "icons": [
     {
       "src": "./icon-192.png",
