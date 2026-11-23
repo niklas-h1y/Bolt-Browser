@@ -1,0 +1,28 @@
+{
+  "name": "bolt-browser",
+  "version": "1.0.0",
+  "description": "Bolt Browser — a Chromium-powered desktop browser",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.bolt.browser",
+    "productName": "Bolt Browser",
+    "files": ["main.js", "preload.js", "index.html", "icon.svg", "extensions/**/*"],
+    "directories": { "output": "dist" },
+    "win": { "target": ["nsis", "zip"] },
+    "mac": { "target": ["dmg", "zip"] },
+    "linux": { "target": ["AppImage", "deb"] }
+  }
+}
