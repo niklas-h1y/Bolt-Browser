@@ -330,7 +330,7 @@ public class MainActivity extends Activity {
             @Override public GeckoResult<AllowOrDeny> onOptionalPrompt(WebExtension extension, String[] permissions, String[] origins) {
                 return GeckoResult.fromValue(AllowOrDeny.DENY);
             }
-            @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension extension, String[] permissions, String[] origins) {
+            @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension currentlyInstalled, WebExtension updatedExtension, String[] newPermissions, String[] newOrigins) {
                 return GeckoResult.fromValue(AllowOrDeny.DENY);
             }
         });
