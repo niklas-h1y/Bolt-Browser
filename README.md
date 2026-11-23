@@ -1,9 +1,10 @@
 # ⚡ Bolt Browser
 
-Bolt Browser has two front ends:
+Bolt Browser has desktop and Android browser front ends, plus a lightweight hosted start page:
 
 - **Desktop Chromium browser:** Electron embeds Chromium and provides native page tabs, downloads, and an interface for loading unpacked Chromium extensions.
-- **Mobile companion:** an installable PWA in `mobile/`, with an optional Capacitor wrapper for Android and iOS.
+- **Android browser:** a native Android app in `app/` using Android System WebView (Chromium-based) with in-app navigation, tabs, bookmarks, history and downloads.
+- **Hosted mobile start page:** a lightweight PWA in `mobile/`; it is not the full browser.
 
 ## Desktop
 
@@ -26,11 +27,15 @@ npm run dist:linux
 
 Open the Bolt menu → **Extensions** → **Load unpacked extension**, then choose a local folder containing `manifest.json`. Extensions are stored in Bolt's persistent Chromium profile. Compatibility depends on the extension's manifest version and APIs; Chrome Web Store one-click installation and every Chrome API are not guaranteed by Electron. Only install extensions you trust.
 
-## Mobile installation
+## Android browser app
 
-See [MOBILE.md](MOBILE.md). The mobile PWA can be installed from Chrome on Android or Safari on iOS. A Capacitor project configuration and dependencies are included for building native wrappers. Android uses Chromium-based Android System WebView; iOS uses WebKit. Mobile does not currently support desktop Chromium extensions.
+The native Android project is in `app/`. Open the repository root in Android Studio, allow Gradle sync, then choose **Build → Build Bundle(s) / APK(s) → Build APK(s)**. The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk` and can be installed on an Android tablet. You can also build it from a machine with Gradle 8.7 and Android SDK 35 using `gradle assembleDebug`.
 
-**Important:** GitHub Pages hosting does not run the native desktop app. The PWA/mobile companion is a separate web experience; deploy the `mobile/` directory to an HTTPS static host to install it directly.
+The Android edition uses Android System WebView, which is Chromium-based. It includes an address/search bar, back/forward/reload/home, multiple tabs, bookmarks, history and Android DownloadManager integration. It is a separate native app from the Electron desktop build. Desktop Chromium extensions are not supported on Android.
+
+The `mobile/` directory remains a lightweight hosted start page/PWA; see [MOBILE.md](MOBILE.md) for details.
+
+**Important:** GitHub Pages only hosts the static start page. It does not run the native Android or desktop browser app.
 
 ## Security and notes
 
