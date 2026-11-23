@@ -1,49 +1,35 @@
 # ⚡ Bolt Browser
 
-Bolt Browser has desktop and Android browser front ends, plus a lightweight hosted start page:
+Bolt Browser has a desktop Electron browser, an Android browser, and a lightweight hosted start page.
 
-- **Desktop Chromium browser:** Electron embeds Chromium and provides page tabs, downloads, and Manifest V3 extension loading.
-- **Extension library:** `extensions/` contains the supported Manifest V3 format, instructions, and a working example extension.
-- **Android browser:** a native Android app in `app/` using Android System WebView (Chromium-based) with in-app navigation, tabs, bookmarks, history and downloads.
-- **Hosted mobile start page:** a lightweight PWA in `mobile/`; it is not the full browser.
+- **Desktop:** Electron + Chromium, tabs, downloads and Manifest V3 extension loading.
+- **Android:** native browser chrome powered by Mozilla GeckoView (the Firefox engine), with tabs, navigation, bookmarks, history and GeckoView WebExtensions.
+- **Hosted start page:** lightweight PWA in `mobile/`.
+
+## Android browser
+
+The native Android project is in `app/`. It uses Mozilla's stable GeckoView Maven artifact rather than Android System WebView. GeckoView is a browser engine intended for embedding in Android browsers.
+
+Open the repository in Android Studio and build **Build → Build Bundle(s) / APK(s) → Build APK(s)**. The debug APK is at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions also builds it on Android project changes.
+
+The Android browser keeps its own top address bar, tab strip and bottom navigation controls. GeckoView renders website content underneath those controls.
+
+## Android extensions
+
+Open the menu → **Install extension (.xpi)** to choose a Mozilla-signed WebExtension package. Open **Extensions** to see installed add-ons and uninstall them. GeckoView validates the XPI signature and Bolt asks before granting the extension's requested permissions.
+
+Important compatibility notes:
+- GeckoView supports Firefox WebExtensions, not every Chrome-only extension API.
+- The Android installer accepts Mozilla-signed `.xpi` packages. Unpacked extension folders and unsigned ZIP files are not installable through GeckoView's normal add-on installation API.
+- The existing `extensions/` sample is a Chromium Manifest V3 desktop example; it may need changes and Mozilla signing before it can run on Android.
+- Extensions installed through GeckoView persist across app restarts.
 
 ## Desktop
 
-Install Node.js 20+, then:
+Install Node.js 20+, then run `npm install` and `npm start`. See `extensions/README.md` for desktop extension instructions.
 
-```bash
-npm install
-npm start
-```
+## Hosted start page
 
-Build installers:
+The `mobile/` directory is a lightweight PWA, not the Android browser itself. See [MOBILE.md](MOBILE.md).
 
-```bash
-npm run dist:win
-npm run dist:mac
-npm run dist:linux
-```
-
-## Desktop extensions
-
-Open the Bolt menu → **Extensions** → **Load unpacked extension**, then choose a local folder containing `manifest.json`. Extensions are stored in Bolt's persistent Chromium profile. Compatibility depends on the extension's manifest version and APIs; Chrome Web Store one-click installation and every Chrome API are not guaranteed by Electron. Only install extensions you trust.
-
-## Android browser app
-
-The native Android project is in `app/`. Open the repository root in Android Studio, allow Gradle sync, then choose **Build → Build Bundle(s) / APK(s) → Build APK(s)**. The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk` and can be installed on an Android tablet. You can also build it from a machine with Gradle 8.7 and Android SDK 35 using `gradle assembleDebug`.
-
-The Android edition uses Android System WebView, which is Chromium-based. Its browser chrome includes a persistent address/search bar, back/forward/reload/home controls, tab strip, bookmarks, history, downloads, settings, and an Extensions information screen. It is a separate native app from the Electron desktop build. **Manifest V3 extensions in `extensions/` currently run only in the desktop Electron build; Android WebView does not include a Chrome extension runtime.**
-
-The `mobile/` directory remains a lightweight hosted start page/PWA; see [MOBILE.md](MOBILE.md) for details.
-
-**Important:** GitHub Pages only hosts the static start page. It does not run the native Android or desktop browser app.
-
-## Extensions
-
-See [`extensions/README.md`](extensions/README.md) for the supported Manifest V3 layout and the example extension. Android extension support is not claimed until a compatible runtime is integrated and tested.
-
-## Security and notes
-
-- Browser pages run in separate Chromium web contents with Node.js integration disabled and context isolation enabled.
-- Downloads use Chromium's native download manager and save to the operating system Downloads folder.
-- Treat browser extensions as trusted code and install only extensions from sources you trust.
+**Important:** GitHub Pages hosts only static files; it does not run the native Android or desktop browser app.
