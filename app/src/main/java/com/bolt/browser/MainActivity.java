@@ -316,21 +316,21 @@ public class MainActivity extends Activity {
     private void configureExtensionPrompts() {
         runtime.getWebExtensionController().setPromptDelegate(new WebExtensionController.PromptDelegate() {
             @Override public GeckoResult<WebExtension.PermissionPromptResponse> onInstallPromptRequest(
-                    WebExtension extension, String[] permissions, String[] origins, String[] dataPermissions) {
+                    WebExtension extension, String[] permissions, String[] origins) {
                 GeckoResult<WebExtension.PermissionPromptResponse> result = new GeckoResult<>();
                 runOnUiThread(() -> new AlertDialog.Builder(MainActivity.this)
                     .setTitle("Install extension?")
-                    .setMessage("This add-on requests:\n" + permissionText(permissions, origins, dataPermissions) + "\n\nOnly install add-ons you trust.")
-                    .setNegativeButton("Cancel", (d,w) -> result.complete(new WebExtension.PermissionPromptResponse(false,false,false)))
-                    .setPositiveButton("Allow", (d,w) -> result.complete(new WebExtension.PermissionPromptResponse(true,false,false)))
-                    .setOnCancelListener(d -> result.complete(new WebExtension.PermissionPromptResponse(false,false,false)))
+                    .setMessage("This add-on requests:\n" + permissionText(permissions, origins, new String[0]) + "\n\nOnly install add-ons you trust.")
+                    .setNegativeButton("Cancel", (d,w) -> result.complete(new WebExtension.PermissionPromptResponse(false,false)))
+                    .setPositiveButton("Allow", (d,w) -> result.complete(new WebExtension.PermissionPromptResponse(true,false)))
+                    .setOnCancelListener(d -> result.complete(new WebExtension.PermissionPromptResponse(false,false)))
                     .show());
                 return result;
             }
-            @Override public GeckoResult<AllowOrDeny> onOptionalPrompt(WebExtension extension, String[] permissions, String[] origins, String[] dataPermissions) {
+            @Override public GeckoResult<AllowOrDeny> onOptionalPrompt(WebExtension extension, String[] permissions, String[] origins) {
                 return GeckoResult.fromValue(AllowOrDeny.DENY);
             }
-            @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension extension, String[] permissions, String[] origins, String[] dataPermissions) {
+            @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension extension, String[] permissions, String[] origins) {
                 return GeckoResult.fromValue(AllowOrDeny.DENY);
             }
         });
