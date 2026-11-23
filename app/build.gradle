@@ -18,5 +18,5 @@ android {
 
 dependencies {
     // latest.release resolves the newest stable GeckoView published by Mozilla.
-    implementation 'org.mozilla.geckoview:geckoview:latest.release'
+    implementation 'org.mozilla.geckoview:geckoview:140.0.20250707120347'
 }
