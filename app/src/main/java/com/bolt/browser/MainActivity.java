@@ -279,6 +279,21 @@ public class MainActivity extends Activity {
         }
         Button plus=button("+",false); plus.setOnClickListener(v -> addTab(HOME));
         tabsBar.addView(plus);
+        updateTabSwitcher();
+    }
+
+    private void updateTabSwitcher() {
+        if (root == null || root.getChildCount() == 0) return;
+        View first = root.getChildAt(0);
+        if (!(first instanceof LinearLayout)) return;
+        LinearLayout row = (LinearLayout) first;
+        for (int j = 0; j < row.getChildCount(); j++) {
+            View item = row.getChildAt(j);
+            if (item instanceof Button && ((Button)item).getText().toString().matches("[0-9]+")) {
+                ((Button)item).setText(String.valueOf(Math.max(1, tabs.size())));
+                return;
+            }
+        }
     }
 
     private String shortTitle(String title) { return title.length()>18 ? title.substring(0,16)+"…" : title; }
