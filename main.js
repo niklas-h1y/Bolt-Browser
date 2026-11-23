@@ -64,14 +64,15 @@ function createTab(url = 'bolt://newtab') {
     publishTabs();
     if (id === activeTabId) send('page-state', { id, url: wc.getURL(), title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   });
-  wc.on('did-navigate', (_event, url) => {
-    if (id === activeTabId) send('page-state', { id, url, title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
+  wc.on('did-navigate', (_event, navigatedUrl) => {
+    if (id === activeTabId) send('page-state', { id, url: navigatedUrl, title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
     publishTabs();
   });
-  wc.on('will-navigate', (_event, url) => send('navigation-started', { id, url }));
+  wc.on('will-navigate', (_event, navigatedUrl) => send('navigation-started', { id, url: navigatedUrl }));
   wc.on('render-process-gone', (_event, details) => send('browser-error', { id, message: 'A page process stopped: ' + details.reason }));
   activate(id);
-  if (url !== 'bolt://newtab') wc.loadURL(navigateTo(url));
+  if (url === 'bolt://newtab') wc.loadFile(path.join(__dirname, 'newtab.html'));
+  else wc.loadURL(navigateTo(url));
   return id;
 }
 function closeTab(id) {
@@ -104,7 +105,7 @@ ipcMain.handle('tab:navigate', (_e, input) => { const item = tabs.get(activeTabI
 ipcMain.handle('tab:back', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
 ipcMain.handle('tab:forward', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); });
 ipcMain.handle('tab:reload', () => tabs.get(activeTabId)?.view.webContents.reload());
-ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadURL('file://' + path.join(__dirname, 'newtab.html')); });
+ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
 ipcMain.handle('extensions:list', () => browserSession().getAllExtensions().map(x => ({ id: x.id, name: x.name, version: x.version })));
 ipcMain.handle('extensions:install', async () => {
@@ -116,7 +117,6 @@ ipcMain.handle('extensions:install', async () => {
   return { id: ext.id, name: ext.name, version: ext.version };
 });
 ipcMain.handle('extensions:remove', async (_e, id) => { await browserSession().removeExtension(id); return true; });
-ipcMain.handle('downloads:list', () => []);
 browserSession().on('will-download', (_event, item) => {
   const filename = item.getFilename();
   send('download-started', { filename, totalBytes: item.getTotalBytes() });
