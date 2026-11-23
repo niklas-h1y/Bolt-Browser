@@ -1,17 +1,20 @@
 # ⚡ Bolt Browser
 
-Bolt Browser is a desktop browser built on **Electron and Chromium**. It is no longer limited to an iframe-based PWA: pages run in native Chromium web contents, with independent tabs, browser navigation, downloads, and support for loading unpacked Chromium extensions.
+Bolt Browser has two front ends:
 
-## Run locally
+- **Desktop Chromium browser:** Electron embeds Chromium and provides native page tabs, downloads, and an interface for loading unpacked Chromium extensions.
+- **Mobile companion:** an installable PWA in `mobile/`, with an optional Capacitor wrapper for Android and iOS.
 
-Install Node.js 20. Add dependencies and launch:
+## Desktop
+
+Install Node.js 20+, then:
 
 ```bash
 npm install
 npm start
 ```
 
-## Build installers
+Build installers:
 
 ```bash
 npm run dist:win
@@ -19,16 +22,18 @@ npm run dist:mac
 npm run dist:linux
 ```
 
-Installers are written to `dist/`.
+## Desktop extensions
 
-## Extensions
+Open the Bolt menu → **Extensions** → **Load unpacked extension**, then choose a local folder containing `manifest.json`. Extensions are stored in Bolt's persistent Chromium profile. Compatibility depends on the extension's manifest version and APIs; Chrome Web Store one-click installation and every Chrome API are not guaranteed by Electron. Only install extensions you trust.
 
-Open the Bolt menu and choose **Extensions** → **Load unpacked extension**, then select a folder containing a `manifest.json`. Bolt uses Electron's Chromium session extension loader. Extensions must be unpacked locally; Chrome Web Store one-click installation and every Chrome API are not guaranteed by Electron. Extension compatibility depends on the extension's manifest version and APIs used. Only install extensions you trust.
+## Mobile installation
 
-Extensions are stored in Bolt's persistent Chromium profile and remain installed between launches.
+See [MOBILE.md](MOBILE.md). The mobile PWA can be installed from Chrome on Android or Safari on iOS. A Capacitor project configuration and dependencies are included for building native wrappers. Android uses Chromium-based Android System WebView; iOS uses WebKit. Mobile does not currently support desktop Chromium extensions.
 
-## Notes
+**Important:** GitHub Pages hosting does not run the native desktop app. The PWA/mobile companion is a separate web experience; deploy the `mobile/` directory to an HTTPS static host to install it directly.
 
-- This is a desktop Electron app that bundles Chromium. Hosting the repository on GitHub Pages will still serve the legacy web/PWA experience; it cannot run the native desktop browser or load desktop extensions.
-- Downloads use Chromium's native download manager and are saved to the operating system Downloads folder.
-- Browser UI runs with context isolation and no Node.js integration. Page contents run in isolated Chromium web contents.
+## Security and notes
+
+- Browser pages run in separate Chromium web contents with Node.js integration disabled and context isolation enabled.
+- Downloads use Chromium's native download manager and save to the operating system Downloads folder.
+- Treat browser extensions as trusted code and install only extensions from sources you trust.
