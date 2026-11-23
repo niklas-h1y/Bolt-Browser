@@ -1,7 +1,7 @@
 {
   "name": "bolt-browser",
   "version": "1.0.0",
-  "description": "Bolt Browser — a Chromium-powered desktop browser",
+  "description": "Bolt Browser — Chromium desktop browser and mobile companion",
   "main": "main.js",
   "private": true,
   "scripts": {
@@ -10,16 +10,25 @@
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "mobile:add:android": "cap add android",
+    "mobile:add:ios": "cap add ios",
+    "mobile:sync": "cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/ios": "^7.4.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.12"
   },
   "build": {
     "appId": "com.bolt.browser",
     "productName": "Bolt Browser",
-    "files": ["main.js", "preload.js", "index.html", "icon.svg", "extensions/**/*"],
+    "files": ["main.js", "preload.js", "index.html", "newtab.html", "icon.svg", "extensions/**/*"],
     "directories": { "output": "dist" },
     "win": { "target": ["nsis", "zip"] },
     "mac": { "target": ["dmg", "zip"] },
