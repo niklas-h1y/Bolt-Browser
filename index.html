@@ -1,105 +1,26 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#10131b">
-<meta name="description" content="Bolt Browser — a fast, lightweight browser experience for the web.">
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>Bolt Browser</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bolt Browser</title>
 <style>
-:root{color-scheme:dark;--bg:#10131b;--panel:#181d28;--panel2:#202736;--line:#2b3445;--text:#edf2fa;--muted:#94a0b4;--accent:#00e676;--accentText:#06140c;--shadow:0 16px 48px #0005}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;height:100dvh;overflow:hidden}
-button,input{font:inherit}button{color:inherit;cursor:pointer;border:0}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.app{height:100%;display:flex;flex-direction:column}.top{background:#141923;border-bottom:1px solid var(--line);padding:10px 14px 0}
-.brandrow{height:32px;display:flex;align-items:center;gap:9px;padding:0 4px 8px}.logo{width:21px;height:21px;border-radius:7px;background:var(--accent);color:#07150c;display:grid;place-items:center;font-weight:900;font-size:14px}.brand{font-weight:750;letter-spacing:.2px}.tag{font-size:11px;color:var(--muted);margin-left:2px}
-.tabs{display:flex;align-items:end;gap:5px;overflow:auto;scrollbar-width:none}.tab{height:35px;min-width:145px;max-width:220px;padding:0 12px;background:transparent;color:var(--muted);border-radius:9px 9px 0 0;display:flex;align-items:center;gap:8px;text-align:left}.tab.active{background:var(--bg);color:var(--text);border:1px solid var(--line);border-bottom-color:var(--bg)}.tabtitle{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}.close{opacity:.55;font-size:17px;line-height:1}.close:hover{opacity:1}.newtab{height:30px;width:32px;background:transparent;color:var(--muted);font-size:20px;border-radius:7px;margin-bottom:2px}.newtab:hover,.iconbtn:hover{background:var(--panel2);color:var(--text)}
-.toolbar{height:54px;display:flex;align-items:center;gap:7px;max-width:1500px;margin:auto}.iconbtn{width:34px;height:34px;border-radius:9px;background:transparent;color:var(--muted);font-size:17px;display:grid;place-items:center;flex-shrink:0}.iconbtn:disabled{opacity:.3;cursor:default}.addresswrap{height:38px;display:flex;align-items:center;gap:9px;padding:0 12px;background:#202736;border:1px solid #303a4c;border-radius:12px;flex:1;min-width:80px}.addresswrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px #00e67618}.lock{color:var(--accent);font-size:13px}.address{width:100%;border:0;outline:0;background:transparent;color:var(--text);font-size:13px}.address::placeholder{color:#7e899b}.go{background:var(--accent);color:var(--accentText);font-weight:750;padding:8px 15px;border-radius:9px}.go:hover{filter:brightness(1.08)}
-.bookmarks{height:32px;display:flex;align-items:center;gap:7px;overflow:auto;scrollbar-width:none;padding:0 3px}.bookmark{background:transparent;color:var(--muted);font-size:12px;white-space:nowrap;padding:5px 8px;border-radius:6px}.bookmark:hover{background:var(--panel2);color:var(--text)}
-.stage{position:relative;flex:1;min-height:0;background:var(--bg)}.view{position:absolute;inset:0;width:100%;height:100%;border:0;background:white;display:none}.view.active{display:block}.home{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;background:radial-gradient(ellipse at 50% 38%,#173126 0%,#10131b 53%)}.homeinner{width:min(660px,calc(100% - 36px));padding:48px 0;text-align:center}.heroicon{width:58px;height:58px;border-radius:19px;background:var(--accent);color:#06140c;display:grid;place-items:center;font-size:34px;font-weight:900;margin:0 auto 22px;box-shadow:0 12px 45px #00e67630}.home h1{font-size:clamp(34px,7vw,54px);line-height:1.05;letter-spacing:-2px;margin:0 0 12px}.home h1 span{color:var(--accent)}.subtitle{color:var(--muted);font-size:15px;margin:0 0 30px}.searchbox{display:flex;gap:8px;padding:7px;background:#202736;border:1px solid #344054;border-radius:15px;box-shadow:var(--shadow)}.searchbox input{flex:1;min-width:0;background:transparent;border:0;outline:0;padding:0 10px;color:var(--text);font-size:14px}.searchbox button{background:var(--accent);color:var(--accentText);font-weight:750;border-radius:10px;padding:11px 18px}.shortcuts{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:25px}.shortcut{width:86px;padding:12px 7px;border-radius:12px;background:#ffffff08;color:var(--muted);font-size:12px}.shortcut:hover{background:#ffffff12;color:var(--text)}.shortcut b{display:grid;place-items:center;width:34px;height:34px;margin:0 auto 7px;border-radius:11px;background:#293445;color:var(--text);font-size:15px}.hint{color:#778397;font-size:11px;margin-top:34px}
-.status{height:23px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;color:#778397;font-size:10px;background:#141923;border-top:1px solid var(--line)}
-.menu{position:absolute;z-index:5;right:13px;top:62px;width:210px;padding:7px;background:#202736;border:1px solid #394456;border-radius:12px;box-shadow:var(--shadow);display:none}.menu.open{display:block}.menu button{display:block;width:100%;text-align:left;padding:9px 10px;background:transparent;border-radius:7px;color:var(--text);font-size:13px}.menu button:hover{background:#ffffff10}.divider{height:1px;background:var(--line);margin:5px}
-.toast{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);background:#273244;border:1px solid #3a465a;color:var(--text);padding:9px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s}.toast.show{opacity:1}
-@media(max-width:600px){.top{padding-left:8px;padding-right:8px}.toolbar{gap:3px}.iconbtn{width:30px}.tab{min-width:115px}.tag{display:none}.go{padding:8px 11px}.bookmarks{gap:1px}}
-</style>
-</head>
-<body>
-<div class="app">
-<header class="top">
- <div class="brandrow"><span class="logo" aria-label="Bolt">⚡</span><span class="brand">Bolt Browser</span><span class="tag">A little faster. A little simpler.</span></div>
- <div class="tabs" id="tabs"></div>
- <div class="toolbar">
-  <button class="iconbtn" id="back" title="Back" aria-label="Back">←</button>
-  <button class="iconbtn" id="forward" title="Forward" aria-label="Forward">→</button>
-  <button class="iconbtn" id="reload" title="Reload" aria-label="Reload">↻</button>
-  <button class="iconbtn" id="homeBtn" title="Home" aria-label="Home">⌂</button>
-  <form class="addresswrap" id="addressForm"><span class="lock">⌕</span><input class="address" id="address" autocomplete="off" spellcheck="false" placeholder="Search or enter a website address"><button class="iconbtn" id="bookmarkBtn" type="button" title="Bookmark this page" aria-label="Bookmark">☆</button></form>
-  <button class="go" type="submit" form="addressForm">Go</button>
-  <button class="iconbtn" id="menuBtn" title="Menu" aria-label="Menu">⋮</button>
- </div>
- <nav class="bookmarks" id="bookmarks"></nav>
-</header>
-<main class="stage" id="stage">
- <section class="home" id="home">
-  <div class="homeinner">
-   <div class="heroicon" aria-label="Bolt">⚡</div><h1>Go your own <span>way.</span></h1><p class="subtitle">A clean place to start exploring the web.</p>
-   <form class="searchbox" id="homeForm"><input id="homeSearch" placeholder="Search the web or enter an address…" autocomplete="off"><button>Search</button></form>
-   <div class="shortcuts">
-    <button class="shortcut" data-url="https://www.google.com"><b>G</b>Google</button>
-    <button class="shortcut" data-url="https://www.youtube.com"><b>▶</b>YouTube</button>
-    <button class="shortcut" data-url="https://www.wikipedia.org"><b>W</b>Wikipedia</button>
-    <button class="shortcut" data-url="https://github.com"><b>⌘</b>GitHub</button>
-   </div>
-   <p class="hint">Tip: press Ctrl / ⌘ + L to focus the address bar</p>
-  </div>
- </section>
- <div id="frames"></div>
- <div class="menu" id="menu">
-  <button data-action="new">＋ New tab <span style="float:right;color:#8d99aa">Ctrl+T</span></button>
-  <button data-action="home">⌂ Home</button>
-  <button data-action="bookmark">☆ Bookmark this page</button>
-  <button data-action="history">◷ Clear browsing history</button>
-  <div class="divider"></div>
-  <button data-action="about">About Bolt Browser</button>
- </div>
- <div class="toast" id="toast"></div>
-</main>
-<footer class="status"><span id="statusText">Ready</span><span> BOLT · WEB</span></footer>
-</div>
+:root{color-scheme:dark;--bg:#10131b;--panel:#181e29;--panel2:#222b3a;--line:#303a4c;--text:#edf2fa;--muted:#96a2b5;--green:#00e676}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px Inter,system-ui,sans-serif;overflow:hidden}.top{height:116px;background:#151a24;border-bottom:1px solid var(--line);padding:8px 12px 0}.brand{height:24px;display:flex;align-items:center;gap:8px;font-weight:750}.bolt{display:grid;place-items:center;background:var(--green);color:#06140c;width:19px;height:19px;border-radius:6px}.tabs{height:34px;display:flex;align-items:end;gap:5px;overflow:auto}.tab{height:30px;min-width:120px;max-width:210px;padding:0 10px;background:transparent;color:var(--muted);border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px}.tab.active{background:var(--bg);color:var(--text);border:1px solid var(--line);border-bottom-color:var(--bg)}.tabtitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left}.x{opacity:.6;font-size:17px}.new{height:27px;width:29px;background:transparent;color:var(--muted);font-size:20px}.toolbar{height:44px;display:flex;align-items:center;gap:5px}.btn{height:32px;min-width:32px;padding:0 9px;background:transparent;color:var(--muted);border-radius:8px;font-size:16px}.btn:hover,.tab:hover{background:var(--panel2);color:var(--text)}.btn:disabled{opacity:.3}.address{height:34px;display:flex;align-items:center;gap:8px;background:#222b3a;border:1px solid #354155;border-radius:10px;padding:0 10px;flex:1}.address input{background:none;border:0;outline:0;color:var(--text);width:100%;font-size:13px}.go{height:30px;padding:0 14px;background:var(--green);color:#06140c;font-weight:750;border-radius:8px}.right{position:relative}.popover{display:none;position:absolute;z-index:10;right:0;top:37px;width:245px;background:#202938;border:1px solid #3a4659;border-radius:12px;padding:8px;box-shadow:0 18px 55px #0008}.popover.open{display:block}.popover button{width:100%;padding:10px;text-align:left;color:var(--text);background:none;border-radius:7px}.popover button:hover{background:#ffffff12}.modalback{display:none;position:fixed;inset:0;z-index:20;background:#0009;align-items:center;justify-content:center}.modalback.open{display:flex}.modal{width:min(540px,calc(100% - 30px));max-height:80vh;overflow:auto;background:#1a2230;border:1px solid #3a4659;border-radius:16px;padding:20px;box-shadow:0 25px 80px #0009}.modal h2{margin:0 0 8px}.muted{color:var(--muted);line-height:1.5}.extrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.primary{background:var(--green);color:#06140c;padding:10px 14px;border-radius:9px;font-weight:700}.secondary{background:var(--panel2);color:var(--text);padding:9px 13px;border-radius:9px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}.status{position:fixed;bottom:0;height:24px;background:#151a24;border-top:1px solid var(--line);width:100%;padding:4px 12px;color:#8390a4;font-size:10px;display:flex;justify-content:space-between}
+</style></head><body>
+<header class="top"><div class="brand"><span class="bolt">⚡</span> Bolt Browser <span style="font-size:10px;color:#8794a8;font-weight:400">CHROMIUM</span></div>
+<div class="tabs" id="tabs"></div>
+<div class="toolbar"><button class="btn" id="back" title="Back">←</button><button class="btn" id="forward" title="Forward">→</button><button class="btn" id="reload" title="Reload">↻</button><button class="btn" id="home" title="New tab">⌂</button>
+<form class="address" id="addressForm"><span style="color:var(--green)">⌕</span><input id="address" placeholder="Search or enter a website address" autocomplete="off" spellcheck="false"></form><button class="go" type="submit" form="addressForm">Go</button>
+<div class="right"><button class="btn" id="menuBtn" title="Bolt menu">⋮</button><div class="popover" id="menu"><button id="extensions">🧩 &nbsp; Extensions</button><button id="downloads">⬇ &nbsp; Open downloads folder</button><button id="newTab">＋ &nbsp; New tab</button><button id="about">⚡ &nbsp; About Bolt Browser</button></div></div></div></header>
+<div class="status"><span id="status">Ready · Chromium engine</span><span>⚡ BOLT</span></div>
+<div class="modalback" id="modalback"><section class="modal"><h2>🧩 Extensions</h2><p class="muted">Load unpacked Chromium extensions from a local folder containing manifest.json. Only install extensions you trust.</p><div id="extensionList"><p class="muted">Loading extensions…</p></div><div class="actions"><button class="secondary" id="done">Close</button><button class="primary" id="install">＋ Load unpacked extension</button></div></section></div>
 <script>
-const $=s=>document.querySelector(s);
-const store={get(k,f){try{return JSON.parse(localStorage.getItem('bolt-'+k))??f}catch{return f}},set(k,v){localStorage.setItem('bolt-'+k,JSON.stringify(v))}};
-let tabs=[],activeId=null,bookmarks=store.get('bookmarks',[]),historyItems=store.get('history',[]);
-const uid=()=>Math.random().toString(36).slice(2,10);
-function normalize(input){let value=input.trim();if(!value)return null;if(/^(https?:\/\/|about:)/i.test(value))return value;if(value.includes(' ')||!value.includes('.')||/^(localhost|\d{1,3}(\.\d{1,3}){3})(:\d+)?$/i.test(value)===false&&value.includes(' '))return 'https://www.google.com/search?q='+encodeURIComponent(value);return 'https://'+value}
-function active(){return tabs.find(t=>t.id===activeId)}
-function titleFor(url){try{return new URL(url).hostname.replace(/^www\./,'')}catch{return 'New tab'}}
-function createTab(url=null){const t={id:uid(),url:null,title:'New tab',history:[],index:-1};tabs.push(t);activeId=t.id;renderTabs();if(url)navigate(url);else showHome();$('#address').focus()}
-function showHome(){const t=active();if(!t)return;t.url=null;t.title='New tab';$('#home').style.display='flex';document.querySelectorAll('.view').forEach(f=>f.classList.remove('active'));$('#address').value='';updateButtons();renderTabs();$('#statusText').textContent='Ready'}
-function navigate(raw,push=true){const url=normalize(raw);if(!url)return;const t=active();if(!t)return;if(push){t.history=t.history.slice(0,t.index+1);t.history.push(url);t.index=t.history.length-1}t.url=url;t.title=titleFor(url);$('#home').style.display='none';let frame=document.getElementById('frame-'+t.id);if(!frame){frame=document.createElement('iframe');frame.className='view';frame.id='frame-'+t.id;frame.referrerPolicy='no-referrer-when-downgrade';frame.allow='fullscreen; clipboard-read; clipboard-write';$('#frames').append(frame)}document.querySelectorAll('.view').forEach(f=>f.classList.remove('active'));frame.classList.add('active');frame.src=url;$('#address').value=url;$('#statusText').textContent='Loading '+url;renderTabs();updateButtons();addHistory(url)}
-function addHistory(url){historyItems=[{url,time:Date.now()},...historyItems.filter(x=>x.url!==url)].slice(0,100);store.set('history',historyItems)}
-function renderTabs(){const el=$('#tabs');el.innerHTML='';tabs.forEach(t=>{const b=document.createElement('button');b.className='tab'+(t.id===activeId?' active':'');b.innerHTML='<span style="color:#00e676">●</span><span class="tabtitle"></span><span class="close" title="Close tab">×</span>';b.querySelector('.tabtitle').textContent=t.title;b.addEventListener('click',e=>{if(e.target.classList.contains('close')){closeTab(t.id);return}switchTab(t.id)});el.append(b)});const n=document.createElement('button');n.className='newtab';n.textContent='+';n.title='New tab';n.onclick=()=>createTab();el.append(n)}
-function switchTab(id){activeId=id;const t=active();renderTabs();if(t.url){$('#home').style.display='none';document.querySelectorAll('.view').forEach(f=>f.classList.toggle('active',f.id==='frame-'+id));$('#address').value=t.url}else showHome();updateButtons()}
-function closeTab(id){const i=tabs.findIndex(t=>t.id===id);if(i<0)return;const f=$('#frame-'+id);if(f)f.remove();tabs.splice(i,1);if(!tabs.length){createTab();return}if(activeId===id){activeId=tabs[Math.max(0,i-1)].id;switchTab(activeId)}else renderTabs()}
-function updateButtons(){const t=active();$('#back').disabled=!t||t.index<=0;$('#forward').disabled=!t||t.index>=t.history.length-1}
-function goHistory(delta){const t=active();if(!t)return;const i=t.index+delta;if(i<0||i>=t.history.length)return;t.index=i;navigate(t.history[i],false)}
-function renderBookmarks(){const el=$('#bookmarks');el.innerHTML='';bookmarks.forEach((b,i)=>{const btn=document.createElement('button');btn.className='bookmark';btn.textContent='◆ '+b.title;btn.title=b.url;btn.onclick=()=>navigate(b.url);btn.oncontextmenu=e=>{e.preventDefault();bookmarks.splice(i,1);store.set('bookmarks',bookmarks);renderBookmarks();toast('Bookmark removed')};el.append(btn)})}
-function bookmarkCurrent(){const t=active();if(!t?.url){toast('Open a page first');return}if(bookmarks.some(b=>b.url===t.url)){toast('Already bookmarked');return}bookmarks.push({url:t.url,title:t.title});store.set('bookmarks',bookmarks);renderBookmarks();toast('Bookmark saved')}
-function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2300)}
-$('#addressForm').addEventListener('submit',e=>{e.preventDefault();navigate($('#address').value);$('#address').blur()});
-$('#homeForm').addEventListener('submit',e=>{e.preventDefault();navigate($('#homeSearch').value)});
-$('#back').onclick=()=>goHistory(-1);$('#forward').onclick=()=>goHistory(1);
-$('#reload').onclick=()=>{const f=$('.view.active');if(f)f.src=f.src;else toast('Home is already up to date')};
-$('#homeBtn').onclick=()=>showHome();$('#bookmarkBtn').onclick=bookmarkCurrent;
-$('#menuBtn').onclick=()=>$('#menu').classList.toggle('open');
-$('#menu').addEventListener('click',e=>{const action=e.target.dataset.action;if(!action)return;$('#menu').classList.remove('open');if(action==='new')createTab();if(action==='home')showHome();if(action==='bookmark')bookmarkCurrent();if(action==='history'){historyItems=[];store.set('history',[]);toast('Browsing history cleared')}if(action==='about')toast('Bolt Browser · Lightweight web app')});
-document.addEventListener('click',e=>{if(!e.target.closest('#menu')&&!e.target.closest('#menuBtn'))$('#menu').classList.remove('open')});
-document.querySelectorAll('.shortcut').forEach(b=>b.onclick=()=>navigate(b.dataset.url));
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='l'){e.preventDefault();$('#address').focus();$('#address').select()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='t'){e.preventDefault();createTab()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='w'){e.preventDefault();closeTab(activeId)}if(e.key==='Escape')$('#menu').classList.remove('open')});
-$('#frames').addEventListener('load',e=>{if(e.target.tagName==='IFRAME'&&e.target.classList.contains('active'))$('#statusText').textContent='Page loaded · '+(active()?.title||'')},true);
-renderBookmarks();createTab();
-if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker:',err)));
-</script>
-</body>
-</html>
+const $=s=>document.querySelector(s);let current=null,tabs=[];
+const invoke=window.bolt;
+function renderTabs(){const root=$('#tabs');root.innerHTML='';tabs.forEach(t=>{const b=document.createElement('button');b.className='tab'+(t.active?' active':'');const title=document.createElement('span');title.className='tabtitle';title.textContent=t.title||'New tab';const close=document.createElement('span');close.className='x';close.textContent='×';close.onclick=e=>{e.stopPropagation();invoke.closeTab(t.id)};b.append(title,close);b.onclick=()=>invoke.activateTab(t.id);root.append(b)});const n=document.createElement('button');n.className='new';n.textContent='+';n.title='New tab';n.onclick=()=>invoke.newTab();root.append(n)}
+function pageState(s){current=s.id;$('#address').value=s.url||'';$('#back').disabled=!s.canGoBack;$('#forward').disabled=!s.canGoForward;$('#status').textContent=s.title||'Ready'}
+invoke.on('tabs-updated',v=>{tabs=v;renderTabs()});invoke.on('page-state',pageState);invoke.on('navigation-started',v=>{if(v.id===current)$('#status').textContent='Loading…'});invoke.on('browser-error',v=>$('#status').textContent=v.message);invoke.on('download-started',v=>$('#status').textContent='Downloading '+v.filename);invoke.on('download-finished',v=>$('#status').textContent='Download '+v.state+': '+v.filename);
+$('#addressForm').onsubmit=e=>{e.preventDefault();invoke.navigate($('#address').value);$('#address').blur()};$('#back').onclick=()=>invoke.back();$('#forward').onclick=()=>invoke.forward();$('#reload').onclick=()=>invoke.reload();$('#home').onclick=()=>invoke.newTab();$('#newTab').onclick=()=>{closeMenu();invoke.newTab()};$('#menuBtn').onclick=()=>$('#menu').classList.toggle('open');function closeMenu(){$('#menu').classList.remove('open')}
+document.addEventListener('click',e=>{if(!e.target.closest('.right'))closeMenu()});$('#downloads').onclick=()=>{closeMenu();invoke.openDownloads()};$('#about').onclick=()=>{closeMenu();$('#status').textContent='Bolt Browser · Chromium-powered desktop browser'};
+$('#extensions').onclick=()=>{closeMenu();$('#modalback').classList.add('open');refreshExtensions()};$('#done').onclick=()=>$('#modalback').classList.remove('open');$('#modalback').onclick=e=>{if(e.target.id==='modalback')$('#modalback').classList.remove('open')};
+async function refreshExtensions(){const list=$('#extensionList');try{const exts=await invoke.listExtensions();list.innerHTML='';if(!exts.length){list.innerHTML='<p class="muted">No extensions installed yet.</p>';return}exts.forEach(ext=>{const row=document.createElement('div');row.className='extrow';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=ext.name;const version=document.createElement('div');version.className='muted';version.textContent='Version '+ext.version;info.append(name,version);const remove=document.createElement('button');remove.className='secondary';remove.textContent='Remove';remove.onclick=async()=>{await invoke.removeExtension(ext.id);refreshExtensions()};row.append(info,remove);list.append(row)})}catch(e){list.textContent=e.message}}
+$('#install').onclick=async()=>{try{const ext=await invoke.installExtension();if(!ext.canceled)refreshExtensions()}catch(e){alert('Could not load extension: '+e.message)}};
+document.addEventListener('keydown',e=>{const mod=e.ctrlKey||e.metaKey;if(mod&&e.key.toLowerCase()==='l'){e.preventDefault();$('#address').focus();$('#address').select()}if(mod&&e.key.toLowerCase()==='t'){e.preventDefault();invoke.newTab()}if(mod&&e.key.toLowerCase()==='w'){e.preventDefault();if(current)invoke.closeTab(current)}if(mod&&e.key.toLowerCase()==='r'){e.preventDefault();invoke.reload()}if(e.key==='Escape')closeMenu()});
+</script></body></html>
