@@ -6,6 +6,7 @@ import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -49,6 +50,7 @@ public class MainActivity extends Activity {
     private FrameLayout webHost;
     private EditText address;
     private TextView status, tabCount;
+    private boolean javascriptEnabled = true;
     private final ArrayList<Tab> tabs = new ArrayList<>();
     private int active = -1;
 
@@ -63,6 +65,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         buildChrome();
+        javascriptEnabled = getPreferences(MODE_PRIVATE).getBoolean("javascript", true);
         addTab(HOME);
     }
 
@@ -121,7 +124,12 @@ public class MainActivity extends Activity {
         address = new EditText(this); address.setSingleLine(true); address.setTextSize(14);
         address.setTextColor(TEXT); address.setHintTextColor(MUTED); address.setHint("Search or enter website");
         address.setImeOptions(EditorInfo.IME_ACTION_GO); address.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        address.setPadding(dp(12), 0, dp(10), 0); address.setBackgroundTintList(android.content.res.ColorStateList.valueOf(PANEL2));
+        address.setPadding(dp(13), 0, dp(10), 0);
+        GradientDrawable addressBg = new GradientDrawable();
+        addressBg.setColor(PANEL2); addressBg.setCornerRadius(dp(13));
+        addressBg.setStroke(dp(1), Color.rgb(48,52,45));
+        address.setBackground(addressBg); address.setHintTextColor(MUTED);
+        address.setTextColor(TEXT); address.setSelectAllOnFocus(true);
         address.setSelectAllOnFocus(true);
         addressRow.addView(address, new LinearLayout.LayoutParams(0, dp(43), 1));
         Button go = button("Go", true); go.setOnClickListener(v -> navigateFromAddress());
@@ -152,7 +160,7 @@ public class MainActivity extends Activity {
         Tab tab = new Tab();
         WebView web = new WebView(this); tab.web = web;
         WebSettings settings = web.getSettings();
-        settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(true);
+        settings.setJavaScriptEnabled(javascriptEnabled); settings.setDomStorageEnabled(true);
         settings.setSupportZoom(true); settings.setBuiltInZoomControls(true); settings.setDisplayZoomControls(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(true); settings.setSupportMultipleWindows(true);
         settings.setLoadWithOverviewMode(true); settings.setUseWideViewPort(true);
@@ -264,9 +272,38 @@ public class MainActivity extends Activity {
         menu.getMenu().add("New tab").setOnMenuItemClickListener(item->{addTab(HOME);return true;});
         menu.getMenu().add("Bookmarks").setOnMenuItemClickListener(item->{showSaved("bookmarks");return true;});
         menu.getMenu().add("History").setOnMenuItemClickListener(item->{showSaved("history");return true;});
+        menu.getMenu().add("Downloads").setOnMenuItemClickListener(item->{openDownloads();return true;});
+        menu.getMenu().add("Extensions").setOnMenuItemClickListener(item->{showExtensionsInfo();return true;});
+        menu.getMenu().add("Settings").setOnMenuItemClickListener(item->{showSettings();return true;});
         menu.getMenu().add("Close current tab").setOnMenuItemClickListener(item->{closeCurrentTab();return true;});
         menu.getMenu().add("About Bolt").setOnMenuItemClickListener(item->{new AlertDialog.Builder(this).setTitle("Bolt Browser").setMessage("Android edition · Chromium-based Android System WebView").setPositiveButton("OK",null).show();return true;});
         menu.show();
+    }
+
+    private void openDownloads() {
+        try { startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)); }
+        catch(Exception ex) { Toast.makeText(this,"Open the Downloads app to view saved files",Toast.LENGTH_LONG).show(); }
+    }
+
+    private void showExtensionsInfo() {
+        new AlertDialog.Builder(this).setTitle("Bolt extensions")
+            .setMessage("Android WebView does not include the Chrome extension runtime. The /extensions folder in the Bolt GitHub project contains Manifest V3 extensions for the desktop Electron build. Android extension support needs a separate compatible runtime; desktop extensions cannot simply be copied into WebView.")
+            .setPositiveButton("OK",null).show();
+    }
+
+    private void showSettings() {
+        String[] options = {"Enable JavaScript", "Clear browsing history", "Clear website data"};
+        boolean[] checked = {javascriptEnabled, false, false};
+        new AlertDialog.Builder(this).setTitle("Settings")
+            .setMultiChoiceItems(options, checked, (dialog, which, isChecked) -> {
+                if (which == 0) {
+                    javascriptEnabled = isChecked;
+                    for (Tab tab : tabs) tab.web.getSettings().setJavaScriptEnabled(javascriptEnabled);
+                    getPreferences(MODE_PRIVATE).edit().putBoolean("javascript", javascriptEnabled).apply();
+                }
+            })
+            .setNeutralButton("Clear history", (dialog, which) -> getPreferences(MODE_PRIVATE).edit().remove("history").apply())
+            .setPositiveButton("Done",null).show();
     }
 
     private void showSaved(String key) {
