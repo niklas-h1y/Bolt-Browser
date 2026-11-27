@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, dialog, session, shell } = require('electron');
+const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
@@ -14,9 +14,22 @@ let extensionPaths = [];
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
+function displayUrl(rawUrl) {
+  const value = String(rawUrl || '');
+  if (!value || value === 'about:blank') return '';
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === 'file:') {
+      const page = path.basename(decodeURIComponent(parsed.pathname)).toLowerCase();
+      if (page === 'newtab.html') return '';
+      if (page === 'extensions.html') return 'bolt://extensions';
+    }
+  } catch (_) {}
+  return value;
+}
 function snapshot() {
   return [...tabs.entries()].map(([id, item]) => ({
-    id, url: item.view.webContents.getURL(), title: item.view.webContents.getTitle() || 'New tab',
+    id, url: displayUrl(item.view.webContents.getURL()), title: item.view.webContents.getTitle() || 'New tab',
     loading: item.view.webContents.isLoading(), active: id === activeTabId
   }));
 }
@@ -34,7 +47,7 @@ function activate(id) {
   activeTabId = id;
   layoutViews();
   const wc = tabs.get(id).view.webContents;
-  send('page-state', { id, url: wc.getURL(), title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
+  send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   publishTabs();
 }
 function isExtensionsUrl(value) {
@@ -63,6 +76,7 @@ function createTab(url = 'bolt://newtab') {
       nodeIntegration: false
     }
   });
+  win.contentView.addChildView(view);
   tabs.set(id, { view });
   const wc = view.webContents;
   wc.setWindowOpenHandler(({ url }) => {
@@ -73,10 +87,10 @@ function createTab(url = 'bolt://newtab') {
   wc.on('did-start-loading', publishTabs);
   wc.on('did-stop-loading', () => {
     publishTabs();
-    if (id === activeTabId) send('page-state', { id, url: wc.getURL(), title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
+    if (id === activeTabId) send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   });
   wc.on('did-navigate', (_event, navigatedUrl) => {
-    if (id === activeTabId) send('page-state', { id, url: navigatedUrl, title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
+    if (id === activeTabId) send('page-state', { id, url: displayUrl(navigatedUrl), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
     publishTabs();
   });
   wc.on('will-navigate', (event, navigatedUrl) => {
@@ -86,6 +100,9 @@ function createTab(url = 'bolt://newtab') {
       return;
     }
     send('navigation-started', { id, url: navigatedUrl });
+  });
+  wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (isMainFrame && errorCode !== -3 && id === activeTabId) send('browser-error', { id, message: `Could not load ${validatedURL}: ${errorDescription} (${errorCode})` });
   });
   wc.on('render-process-gone', (_event, details) => send('browser-error', { id, message: 'A page process stopped: ' + details.reason }));
   activate(id);
@@ -98,6 +115,7 @@ function closeTab(id) {
   const item = tabs.get(id);
   if (!item) return;
   tabs.delete(id);
+  win?.contentView.removeChildView(item.view);
   item.view.webContents.close();
   if (activeTabId === id) {
     const next = [...tabs.keys()].at(-1);
@@ -111,7 +129,7 @@ function createWindow() {
     title: 'Bolt Browser',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
-  win.loadFile('index.html');
+  win.loadFile(path.join(__dirname, 'index.html')).catch(error => console.error('Could not load browser UI:', error));
   win.on('resize', layoutViews);
   win.on('closed', () => { win = null; tabs.clear(); });
   win.webContents.on('did-finish-load', () => createTab());
@@ -199,6 +217,7 @@ ipcMain.handle('extensions:remove', async (event, id) => {
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('com.bolt.browser');
+  Menu.setApplicationMenu(null);
 
   // Session access is only valid after Electron has emitted app 'ready'.
   const ses = browserSession();
