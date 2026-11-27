@@ -24,6 +24,7 @@ let chromeHidden = false;
 let permissionManager;
 let extensionManager;
 let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
+let siteOverrides = {};
 let shieldEnabled = true;
 let blockedRequestCount = 0;
 let shieldRequestListener = null;
@@ -34,8 +35,8 @@ let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 const sessionPath = () => path.join(app.getPath('userData'), 'session.json');
-function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; } catch (_) {} }
-function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, shieldEnabled, uiSettings }, null, 2), 'utf8'); }
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; } catch (_) {} }
+function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, siteOverrides, shieldEnabled, uiSettings }, null, 2), 'utf8'); }
 function isChromeWebStoreRequest(details) {
   try {
     const requestUrl = new URL(details.url);
@@ -755,6 +756,37 @@ ipcMain.handle('settings:clear-background', event => {
   publishUiSettings();
   return true;
 });
+function currentSiteOrigin() {
+  try {
+    const raw = tabs.get(activeTabId)?.view.webContents.getURL() || '';
+    const parsed = new URL(raw);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.origin : '';
+  } catch (_) { return ''; }
+}
+ipcMain.handle('site:get-settings', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const origin = currentSiteOrigin();
+  return { origin, settings: origin ? { ...(siteOverrides[origin] || {}) } : {} };
+});
+ipcMain.handle('site:set-settings', (event, next) => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const origin = currentSiteOrigin();
+  if (!origin) throw new Error('Open a website before changing site-specific settings.');
+  if (!next || typeof next !== 'object' || Array.isArray(next)) throw new Error('Invalid site settings.');
+  const allowed = ['camera', 'microphone', 'geolocation', 'notifications', 'clipboard-read', 'display-capture'];
+  const updated = { ...(siteOverrides[origin] || {}) };
+  for (const key of allowed) {
+    if (!(key in next)) continue;
+    if (next[key] === null) delete updated[key];
+    else if (typeof next[key] === 'boolean') updated[key] = next[key];
+    else throw new Error('Invalid decision for ' + key + '.');
+  }
+  if (Object.keys(updated).length) siteOverrides[origin] = updated;
+  else delete siteOverrides[origin];
+  saveSettings();
+  send('site-settings-updated', { origin, settings: { ...updated } });
+  return { origin, settings: { ...updated } };
+});
 ipcMain.handle('settings:get-permissions', (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
   return { ...permissionSettings };
@@ -887,7 +919,7 @@ app.whenReady().then(async () => {
     }
     callback({ requestHeaders: headers });
   });
-  permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
+  permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
   extensionManager = new ElectronChromeExtensions({
     session: ses,
     createTab: async details => {
