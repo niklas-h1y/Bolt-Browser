@@ -12,6 +12,9 @@ This project is actively developed. Entries describe repository changes and do n
 - **Private-tab indicators:** incognito tabs are visibly marked in the tab strip.
 - **Privacy-preserving session handling:** incognito tabs are excluded from automatic session restoration and browser backup exports.
 - **Workspace session restoration:** restored tabs are assigned to their saved workspace partition.
+- **Refreshed mobile PWA start page:** redesigned `mobile/index.html` with a modern dark interface, lime accent styling, responsive mobile-first layout, live clock/date and time-based greeting.
+- **Updated mobile navigation and shortcuts:** added a polished search/address field, quick-access website tiles and a slide-up menu for common actions.
+- **Improved saved-page and install presentation:** added a dedicated saved-pages panel and clearer PWA installation affordance while retaining the existing manifest and service-worker integration.
 
 ### Security and privacy notes
 - Incognito sessions do not persist cookies, site storage or cache after the private tab is closed. Incognito does not make a user anonymous to websites, employers, schools, internet providers or network operators.
