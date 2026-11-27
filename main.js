@@ -290,6 +290,7 @@ ipcMain.handle('extensions:remove', async (event, id) => {
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('com.bolt.browser');
+  app.setAsDefaultProtocolClient('bolt');
   Menu.setApplicationMenu(null);
 
   // Session access is only valid after Electron has emitted app 'ready'.
