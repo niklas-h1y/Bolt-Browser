@@ -23,8 +23,10 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     removeExtension: id => invoke('extensions:remove', id),
     openExtensionPopup: id => invoke('extensions:open-popup', id),
     openDownloads: () => invoke('download:open-folder'),
+    getPermissionSettings: () => invoke('settings:get-permissions'),
+    setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
-      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished'];
+      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed'];
       if (allowed.includes(channel)) ipcRenderer.on(channel, (_event, data) => callback(data));
     }
   });
