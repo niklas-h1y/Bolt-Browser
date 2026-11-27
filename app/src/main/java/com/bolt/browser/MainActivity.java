@@ -82,6 +82,7 @@ public class MainActivity extends Activity {
         loadMobilePreferences();
         applyMobileTheme();
         if (runtime == null) runtime = GeckoRuntime.create(this);
+        runtime.getSettings().getContentBlocking().setCookieBehavior(ContentBlocking.CookieBehavior.ACCEPT_NON_TRACKERS);
         runtime.getSettings().getContentBlocking().setEnhancedTrackingProtectionLevel(ContentBlocking.EtpLevel.STRICT);
         configureExtensionPrompts();
         buildChrome();
