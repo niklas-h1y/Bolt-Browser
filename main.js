@@ -478,6 +478,15 @@ ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webCon
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
 ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
 ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
+ipcMain.handle('app:get-info', event => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Application information access denied.');
+  return {
+    version: app.getVersion(),
+    electron: process.versions.electron || 'Unknown',
+    chromium: process.versions.chrome || 'Unknown',
+    node: process.versions.node || 'Unknown'
+  };
+});
 ipcMain.handle('settings:get-ui', event => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
   return { ...uiSettings };
