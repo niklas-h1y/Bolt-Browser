@@ -87,6 +87,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     removeExtension: id => invoke('extensions:remove', id),
     openExtensionPopup: id => invoke('extensions:open-popup', id),
     openDownloads: () => invoke('download:open-folder'),
+    getAppInfo: () => invoke('app:get-info'),
     getShieldState: () => invoke('shield:get-state'),
     setShieldEnabled: enabled => invoke('shield:set-enabled', enabled),
     getUiSettings: () => invoke('settings:get-ui'),
