@@ -35,3 +35,22 @@ For development, install Node.js 20+, then run `npm install` and `npm start`. Se
 The `mobile/` directory is a lightweight PWA, not the Android browser itself. See [MOBILE.md](MOBILE.md).
 
 **Important:** GitHub Pages hosts only static files; it does not run the native Android or desktop browser app.
+
+## Google Play Store Android App Bundle
+
+GitHub Actions builds the debug APK and a separate release Android App Bundle (AAB). Download the `bolt-browser-playstore-aab` artifact from the Android workflow run. The release bundle is signed when all four repository secrets below are configured; without them, the workflow still produces an unsigned AAB for testing. The existing `bolt-browser-android-debug` APK artifact remains available.
+
+To enable release signing, create an upload keystore and add these under **Repository → Settings → Secrets and variables → Actions → New repository secret**:
+
+- `ANDROID_KEYSTORE_BASE64` — the keystore file encoded as a single base64 string.
+- `ANDROID_KEYSTORE_PASSWORD` — the keystore password.
+- `ANDROID_KEY_ALIAS` — the key alias.
+- `ANDROID_KEY_PASSWORD` — the key password.
+
+Generate a keystore and its base64 value in one line (replace the sample alias and use a strong password):
+
+```sh
+keytool -genkeypair -v -keystore release.keystore -alias bolt-upload -keyalg RSA -keysize 2048 -validity 10000 && base64 -w 0 release.keystore
+```
+
+Copy the base64 output into `ANDROID_KEYSTORE_BASE64`, and save the exact keystore password, alias, and key password in the other three secrets. Keep `release.keystore` and all passwords private; do not commit them. For production distribution, enroll in Google Play App Signing and retain a secure backup of your upload key.
