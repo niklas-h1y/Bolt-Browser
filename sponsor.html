@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101522">
+  <meta name="description" content="Get Bolt Browser for Windows, Android, and Linux.">
+  <title>Get Bolt Browser</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#141c2e; --muted:#aab6cc; --text:#f4f7ff; --accent:#7c9cff; --line:#2a3852; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:28px 16px; color:var(--text); background:radial-gradient(ellipse at 50% -10%,#25365d 0,transparent 55%),var(--bg); font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    main { width:min(100%,660px); }
+    .card { padding:clamp(24px,5vw,44px); border:1px solid var(--line); border-radius:24px; background:rgba(20,28,46,.94); box-shadow:0 24px 80px #0007; }
+    .brand { display:inline-flex; align-items:center; gap:10px; color:#c8d6ff; font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:.78rem; }
+    .bolt { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:#24375f; color:#a9c0ff; font-size:1.2rem; }
+    h1 { margin:22px 0 8px; font-size:clamp(2rem,7vw,3.2rem); line-height:1.08; letter-spacing:-.04em; }
+    .intro { margin:0; color:var(--muted); font-size:1.05rem; }
+    .notice { margin:24px 0; padding:16px 18px; border:1px solid #31466b; border-radius:14px; background:#192844; color:#dce7ff; }
+    .notice strong { color:#fff; }
+    .downloads { display:grid; gap:12px; margin-top:26px; }
+    button { font:inherit; cursor:pointer; }
+    .download { width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 18px; border:1px solid var(--line); border-radius:14px; color:var(--text); background:#1b2740; text-align:left; transition:transform .15s,border-color .15s,background .15s; }
+    .download:hover { transform:translateY(-2px); border-color:#7698ff; background:#223252; }
+    .download.primary { background:#3159b8; border-color:#557de0; }
+    .download.primary:hover { background:#3b68d2; }
+    .download small { display:block; color:#c0cce2; font-size:.83rem; }
+    .arrow { color:#c7d5ff; font-size:1.3rem; }
+    .foot { margin:24px 0 0; color:#8998b2; font-size:.82rem; text-align:center; }
+    .foot a { color:#b9caff; }
+    .overlay { position:fixed; inset:0; display:none; place-items:center; padding:18px; background:#050914d9; z-index:5; }
+    .overlay.open { display:grid; }
+    .dialog { width:min(100%,520px); max-height:min(85vh,700px); overflow:auto; padding:24px; border:1px solid #394b6a; border-radius:20px; background:#151f33; box-shadow:0 24px 90px #000a; }
+    .dialog h2 { margin:0 0 8px; font-size:1.45rem; }
+    .dialog p { color:var(--muted); margin:0 0 18px; }
+    .urlbox { padding:13px; border:1px solid #354663; border-radius:10px; background:#0b1220; color:#dbe5ff; overflow-wrap:anywhere; font-size:.9rem; user-select:all; }
+    .actions { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+    .action { flex:1; min-width:120px; padding:11px 15px; border:1px solid #526b9c; border-radius:10px; background:#3159b8; color:white; font-weight:650; }
+    .action.secondary { background:transparent; border-color:#42516b; color:#d8e1f3; }
+    .linux-list { display:grid; gap:10px; margin-top:18px; }
+    .linux-choice { padding:13px 15px; text-align:left; border:1px solid #354663; border-radius:11px; color:var(--text); background:#1b2942; }
+    .linux-choice:hover { border-color:#7698ff; }
+    .linux-choice small { display:block; color:var(--muted); }
+    .status { min-height:1.4em; margin-top:12px; color:#a9c0ff; font-size:.9rem; }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card" aria-labelledby="title">
+      <div class="brand"><span class="bolt" aria-hidden="true">ϟ</span> Independent browser project</div>
+      <h1 id="title">Meet Bolt Browser.</h1>
+      <p class="intro">A browser built for everyday browsing, with useful tools for people who like to build for the web. If you enjoy the project, try it out and share it.</p>
+
+      <div class="notice">
+        <strong>Is it safe?</strong> Bolt is an open-source project, and its source code and release files are published on GitHub. You can inspect the code before installing. Only download from the official Bolt Browser repository, check the permissions requested by any app, and remember that no software can be guaranteed risk-free.
+      </div>
+
+      <div class="downloads" aria-label="Download options">
+        <button class="download primary" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases/download/v1.0.0/Bolt-Browser-Setup-1.0.0.exe" data-title="Windows installer">
+          <span><strong>Download for Windows</strong><small>Windows setup · EXE</small></span><span class="arrow" aria-hidden="true">↗</span>
+        </button>
+        <button class="download" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/android.yml" data-title="Android builds">
+          <span><strong>Get Bolt for Android</strong><small>Open Android builds on GitHub to download the APK artifact</small></span><span class="arrow" aria-hidden="true">↗</span>
+        </button>
+        <button class="download" id="linuxButton" type="button">
+          <span><strong>Linux users — choose a package</strong><small>AppImage · Debian / Ubuntu (.deb) · Fedora / openSUSE (.rpm)</small></span><span class="arrow" aria-hidden="true">＋</span>
+        </button>
+      </div>
+      <p class="foot">Bolt Browser is an independent project. View the <a href="https://github.com/niklas-h1y/Bolt-Browser" target="_blank" rel="noopener noreferrer">source repository</a> and <a href="https://github.com/niklas-h1y/Bolt-Browser/releases" target="_blank" rel="noopener noreferrer">releases</a>.</p>
+    </section>
+  </main>
+
+  <div class="overlay" id="copyOverlay" role="dialog" aria-modal="true" aria-labelledby="copyTitle">
+    <div class="dialog">
+      <h2 id="copyTitle">Copy download URL</h2>
+      <p id="copyDescription">Copy this official Bolt Browser link.</p>
+      <div class="urlbox" id="urlText"></div>
+      <div class="actions">
+        <button class="action" id="copyButton" type="button">Copy URL</button>
+        <button class="action secondary" type="button" data-close>Close</button>
+      </div>
+      <div class="status" id="copyStatus" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="linuxOverlay" role="dialog" aria-modal="true" aria-labelledby="linuxTitle">
+    <div class="dialog">
+      <h2 id="linuxTitle">Bolt for Linux</h2>
+      <p>Choose your package type. The button will show you the GitHub build page and let you copy its URL; it won't open a new window.</p>
+      <div class="linux-list">
+        <button class="linux-choice" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/linux-appimage.yml" data-title="Linux AppImage">AppImage <small>Portable package for many Linux distributions</small></button>
+        <button class="linux-choice" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/linux-deb.yml" data-title="Linux DEB">DEB <small>Debian, Ubuntu, Linux Mint and derivatives</small></button>
+        <button class="linux-choice" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/linux-rpm.yml" data-title="Linux RPM">RPM <small>Fedora, openSUSE and compatible distributions</small></button>
+      </div>
+      <div class="actions"><button class="action secondary" type="button" data-close>Close</button></div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const copyOverlay = document.getElementById('copyOverlay');
+      const linuxOverlay = document.getElementById('linuxOverlay');
+      const urlText = document.getElementById('urlText');
+      const copyTitle = document.getElementById('copyTitle');
+      const copyDescription = document.getElementById('copyDescription');
+      const copyStatus = document.getElementById('copyStatus');
+      let selectedUrl = '';
+
+      function showCopy(title, url) {
+        selectedUrl = url;
+        copyTitle.textContent = 'Copy ' + title + ' URL';
+        copyDescription.textContent = 'Copy this official GitHub link. No new window will be opened.';
+        urlText.textContent = url;
+        copyStatus.textContent = '';
+        linuxOverlay.classList.remove('open');
+        copyOverlay.classList.add('open');
+        document.getElementById('copyButton').focus();
+      }
+
+      document.querySelectorAll('[data-copy-url]').forEach(button => {
+        button.addEventListener('click', () => showCopy(button.dataset.title, button.dataset.copyUrl));
+      });
+
+      document.getElementById('linuxButton').addEventListener('click', () => {
+        linuxOverlay.classList.add('open');
+        linuxOverlay.querySelector('[data-close]').focus();
+      });
+
+      document.getElementById('copyButton').addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(selectedUrl);
+          } else {
+            const field = document.createElement('textarea');
+            field.value = selectedUrl;
+            field.style.position = 'fixed';
+            field.style.opacity = '0';
+            document.body.appendChild(field);
+            field.select();
+            const copied = document.execCommand('copy');
+            field.remove();
+            if (!copied) throw new Error('Clipboard unavailable');
+          }
+          copyStatus.textContent = 'URL copied to clipboard.';
+        } catch {
+          copyStatus.textContent = 'Copy was blocked by the browser. Select the URL above and copy it manually.';
+        }
+      });
+
+      document.querySelectorAll('[data-close]').forEach(button => {
+        button.addEventListener('click', () => button.closest('.overlay').classList.remove('open'));
+      });
+
+      [copyOverlay, linuxOverlay].forEach(overlay => {
+        overlay.addEventListener('click', event => {
+          if (event.target === overlay) overlay.classList.remove('open');
+        });
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+          copyOverlay.classList.remove('open');
+          linuxOverlay.classList.remove('open');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
