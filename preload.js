@@ -107,7 +107,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
-      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated', 'workspaces-updated'];
+      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated', 'workspaces-updated', 'reader-state'];
       if (allowed.includes(channel)) ipcRenderer.on(channel, (_event, data) => callback(data));
     }
   });
