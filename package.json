@@ -51,7 +51,14 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "Bolt uses your camera when you allow a website to make video calls.",
+        "NSMicrophoneUsageDescription": "Bolt uses your microphone when you allow a website to make audio or video calls.",
+        "NSLocationUsageDescription": "Bolt shares your location only when you grant a website location permission.",
+        "NSBluetoothAlwaysUsageDescription": "Bolt accesses Bluetooth devices only when you select a device for a website.",
+        "NSAudioCaptureUsageDescription": "Bolt captures system audio only when you explicitly choose to share it."
+      }
     },
     "linux": {
       "target": [
