@@ -1,7 +1,7 @@
 const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { pathToFileURL } = require('node:url');
+const { pathToFileURL, fileURLToPath } = require('node:url');
 const crypto = require('node:crypto');
 const os = require('node:os');
 const extractZip = require('extract-zip');
@@ -449,21 +449,36 @@ function extractChromeExtensionId(input) {
 function extensionSummary(extension) {
   return { id: extension.id, name: extension.name, version: extension.version, description: extension.manifest?.description || '', hasPopup: Boolean(extension.manifest?.action?.default_popup || extension.manifest?.browser_action?.default_popup) };
 }
-function isExtensionsManagerSender(event) {
+function isAppUiSender(event) {
   try {
+    if (!event?.sender || !event?.senderFrame || event.senderFrame !== event.sender.mainFrame) return false;
     const senderUrl = new URL(event.senderFrame.url);
-    return senderUrl.protocol === 'file:' && ['index.html', 'newtab.html', 'extensions.html'].includes(path.basename(senderUrl.pathname));
+    if (senderUrl.protocol !== 'file:' || senderUrl.search || senderUrl.hash) return false;
+    const allowedFiles = new Set(['index.html', 'newtab.html', 'extensions.html']);
+    const senderPath = path.resolve(fileURLToPath(senderUrl));
+    const expectedPath = path.resolve(path.join(__dirname, path.basename(senderPath)));
+    if (!allowedFiles.has(path.basename(senderPath)) || senderPath !== expectedPath) return false;
+    const isBrowserUi = win && !win.isDestroyed() && event.sender === win.webContents;
+    const isManagedTab = [...tabs.values()].some(item =>
+      item.view.webContents === event.sender && !item.view.webContents.isDestroyed()
+    );
+    return Boolean(isBrowserUi || isManagedTab);
   } catch (_) { return false; }
+}
+function isExtensionsManagerSender(event) {
+  return isAppUiSender(event);
 }
 
 ipcMain.handle('tab:overlay', (_e, isOpen) => {
+  if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.');
   overlayOpen = Boolean(isOpen);
   layoutViews();
 });
-ipcMain.handle('tab:new', (_e, url) => createTab(url || 'bolt://newtab'));
-ipcMain.handle('tab:activate', (_e, id) => activate(Number(id)));
-ipcMain.handle('tab:close', (_e, id) => closeTab(Number(id)));
+ipcMain.handle('tab:new', (_e, url) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return createTab(url || 'bolt://newtab'); });
+ipcMain.handle('tab:activate', (_e, id) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return activate(Number(id)); });
+ipcMain.handle('tab:close', (_e, id) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return closeTab(Number(id)); });
 ipcMain.handle('tab:navigate', (_e, input) => {
+  if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.');
   const item = tabs.get(activeTabId);
   if (!item) return;
   const page = internalPageForUrl(input);
@@ -471,11 +486,11 @@ ipcMain.handle('tab:navigate', (_e, input) => {
   else if (page === 'unsupported') loadInternalPage(item.view.webContents, 'unsupported');
   else item.view.webContents.loadURL(navigateTo(input));
 });
-ipcMain.handle('tab:back', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
-ipcMain.handle('tab:forward', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); });
-ipcMain.handle('tab:reload', () => tabs.get(activeTabId)?.view.webContents.reload());
-ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
-ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
+ipcMain.handle('tab:back', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
+ipcMain.handle('tab:forward', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); });
+ipcMain.handle('tab:reload', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return tabs.get(activeTabId)?.view.webContents.reload(); });
+ipcMain.handle('tab:home', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
+ipcMain.handle('download:open-folder', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return shell.openPath(app.getPath('downloads')); });
 ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
 ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
 ipcMain.handle('app:get-info', event => {
