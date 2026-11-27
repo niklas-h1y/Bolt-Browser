@@ -21,7 +21,7 @@ Bolt uses the persistent `persist:bolt` Electron session. The handlers live in `
 1. Open **Windows Settings → Privacy & security → Location**.
 2. Turn on **Location services** and allow desktop apps to access location when Windows presents that control.
 3. In the Bolt settings modal, enable **Location & approximate location** and reload the site/request location again.
-4. If Chromium's network geolocation provider still cannot resolve a location, configure a Google Cloud API key with the Geolocation API enabled and billing enabled. Set the environment variable `BOLT_GOOGLE_API_KEY` before launching/building Bolt. The main process copies it to Electron's expected `GOOGLE_API_KEY`; do not commit the key to source control or ship it in a public installer. Restrict the key and monitor usage in Google Cloud.
+4. If Chromium's network geolocation provider still cannot resolve a location, configure a Google Cloud API key with the Geolocation API enabled and billing enabled. Set the user environment variable `BOLT_GOOGLE_API_KEY` on the Windows account that runs Bolt (for example, in PowerShell: `[Environment]::SetEnvironmentVariable('BOLT_GOOGLE_API_KEY', 'YOUR_KEY', 'User')`), then fully restart Bolt. The main process copies it to Electron's expected `GOOGLE_API_KEY`; setting it only in a build job will not configure an already-installed app. Do not commit the key to source control or bake it into a public installer. Restrict the key and monitor usage in Google Cloud.
 
 Electron geolocation relies on Google's geolocation web service; the API key is not a replacement for the user's operating-system privacy controls.
 
