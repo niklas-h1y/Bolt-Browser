@@ -114,6 +114,24 @@ function showWebStoreInstallToast(webContents, message) {
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
+
+function publishUiSettings() {
+  const payload = { ...uiSettings };
+  if (win && !win.isDestroyed()) win.webContents.send('ui-settings-updated', payload);
+
+  for (const { view } of tabs.values()) {
+    const webContents = view?.webContents;
+    if (!webContents || webContents.isDestroyed()) continue;
+    try {
+      const senderUrl = new URL(webContents.getURL());
+      if (senderUrl.protocol !== 'file:' || senderUrl.search || senderUrl.hash) continue;
+      const senderPath = path.resolve(fileURLToPath(senderUrl));
+      const expectedPath = path.resolve(path.join(__dirname, path.basename(senderPath)));
+      if (senderPath !== expectedPath || path.basename(senderPath) !== 'newtab.html') continue;
+      webContents.send('ui-settings-updated', payload);
+    } catch (_) {}
+  }
+}
 function handleExternalProtocol(rawUrl) {
   try {
     const parsed = new URL(rawUrl);
@@ -508,14 +526,15 @@ ipcMain.handle('settings:get-ui', event => {
 });
 ipcMain.handle('settings:set-ui', (event, next) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
-  if (!next || typeof next !== 'object') throw new Error('Invalid UI settings.');
+  if (!next || typeof next !== 'object' || Array.isArray(next)) throw new Error('Invalid UI settings.');
   const themes = ['bolt-dark','midnight-neon','oled-black','clean-light'];
   const theme = themes.includes(next.theme) ? next.theme : uiSettings.theme;
-  const accent = /^#[0-9a-f]{6}$/i.test(String(next.accent || '')) ? next.accent : uiSettings.accent;
+  const accent = /^#[0-9a-f]{6}$/i.test(String(next.accent || '')) ? String(next.accent).toLowerCase() : uiSettings.accent;
   const engines = ['google','duckduckgo','bing'];
   const searchEngine = engines.includes(next.searchEngine) ? next.searchEngine : uiSettings.searchEngine;
   uiSettings = { ...uiSettings, theme, accent, searchEngine, startup: 'newtab' };
   saveSettings();
+  publishUiSettings();
   return { ...uiSettings };
 });
 ipcMain.handle('settings:get-permissions', (event) => {
