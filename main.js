@@ -101,6 +101,7 @@ function createTab(url = 'bolt://newtab') {
   tabs.set(id, { view });
   const wc = view.webContents;
   if (permissionManager) permissionManager.attachWebContents(wc);
+  wc.on('did-create-window', childWindow => { if (permissionManager && childWindow?.webContents) permissionManager.attachWebContents(childWindow.webContents); });
   wc.setWindowOpenHandler(({ url, features }) => {
     let target;
     try { target = new URL(url); } catch { return { action: 'deny' }; }
@@ -295,6 +296,28 @@ app.whenReady().then(async () => {
   loadSettings();
   const ses = browserSession();
   permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
+  if (process.platform === 'darwin' && typeof app.configureWebAuthn === 'function' && process.env.BOLT_WEBAUTHN_KEYCHAIN_GROUP) {
+    app.configureWebAuthn({
+      touchID: { keychainAccessGroup: process.env.BOLT_WEBAUTHN_KEYCHAIN_GROUP, promptReason: 'verify your identity for $1' },
+      platformPasskeys: process.env.BOLT_ENABLE_PLATFORM_PASSKEYS === '1'
+    });
+    ses.on('select-webauthn-account', async (_event, details, callback) => {
+      try {
+        const accounts = details.accounts || [];
+        if (!accounts.length) return callback();
+        const labels = accounts.map(account => account.name || account.displayName || account.credentialId);
+        const result = await dialog.showMessageBox(win, {
+          type: 'question', title: 'Choose a passkey', message: 'Choose an account for ' + details.relyingPartyId,
+          buttons: [...labels, 'Cancel'], defaultId: 0, cancelId: labels.length, noLink: true
+        });
+        callback(result.response < accounts.length ? accounts[result.response].credentialId : undefined);
+      } catch (error) { console.error('WebAuthn account selection failed:', error); callback(); }
+    });
+    ses.on('select-webauthn-authenticator', (event, callback) => {
+      try { callback(event.authenticators.includes('platformPasskeys') ? 'platformPasskeys' : event.authenticators[0]); }
+      catch (error) { console.error('WebAuthn authenticator selection failed:', error); callback(); }
+    });
+  }
   protocol.handle('bolt', request => {
     const host = new URL(request.url).hostname;
     const file = host === 'newtab' ? 'newtab.html' : host === 'extensions' ? 'extensions.html' : null;
@@ -310,6 +333,9 @@ app.whenReady().then(async () => {
   });
 
   await restoreExtensions();
+  // Castlabs ECS exposes a components API for installing/updating the Widevine CDM.
+  try { const components = require('electron').components; if (components?.whenReady) await components.whenReady(); }
+  catch (error) { console.warn('Widevine component setup was unavailable:', error.message); }
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
