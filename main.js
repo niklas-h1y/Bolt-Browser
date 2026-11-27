@@ -271,6 +271,7 @@ function activate(id) {
   const wc = tabs.get(id).view.webContents;
   if (extensionManager) extensionManager.selectTab(wc);
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
+  send('reader-state', Boolean(tabs.get(id).readerCssKey));
   publishTabs();
 }
 function internalPageForUrl(value) {
@@ -373,6 +374,8 @@ function createTab(url = 'bolt://newtab') {
     if (id === activeTabId) send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   });
   wc.on('did-navigate', (_event, navigatedUrl) => {
+    item.readerCssKey = null;
+    if (id === activeTabId) send('reader-state', false);
     if (id === activeTabId) send('page-state', { id, url: displayUrl(navigatedUrl), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
     publishTabs();
   });
@@ -646,6 +649,7 @@ ipcMain.handle('reader:toggle', async event => {
   if (item.readerCssKey) {
     try { await wc.removeInsertedCSS(item.readerCssKey); } catch (_) {}
     item.readerCssKey = null;
+    send('reader-state', false);
     return false;
   }
   const css = `
@@ -660,6 +664,7 @@ ipcMain.handle('reader:toggle', async event => {
     a { color: #245c8a !important; }
   `;
   item.readerCssKey = await wc.insertCSS(css);
+  send('reader-state', true);
   return true;
 });
 ipcMain.handle('resource:get-stats', event => {
