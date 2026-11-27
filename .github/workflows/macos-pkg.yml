@@ -1,0 +1,48 @@
+name: macOS PKG
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-pkg:
+    name: Build macOS PKG (Intel and Apple silicon)
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build extension action preload
+        run: npm run build:preload
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check main.js
+          node --check preload.js
+          node --check preload.bundle.js
+          node --check permissions.js
+
+      - name: Build PKG installers
+        run: npx electron-builder --mac pkg --x64 --arm64 --publish never
+
+      - name: Upload PKG installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bolt-Browser-macOS-PKG
+          path: dist/*.pkg
+          if-no-files-found: error
+          retention-days: 30
