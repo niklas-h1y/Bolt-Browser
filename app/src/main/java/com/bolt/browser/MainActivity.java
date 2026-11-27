@@ -151,7 +151,6 @@ public class MainActivity extends Activity {
                     .setNegativeButton("Deny",(d,w)->result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY))
                     .setPositiveButton("Allow",(d,w)->result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW))
                     .setOnCancelListener(d->result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY)).show();
-                permission.notifyShown();
                 return result;
             }
             @Override public void onMediaPermissionRequest(GeckoSession requestingSession, String uri, MediaSource[] video, MediaSource[] audio, MediaCallback callback) {
