@@ -27,7 +27,7 @@
     .download small { display:block; color:#c0cce2; font-size:.83rem; }
     .arrow { color:#c7d5ff; font-size:1.3rem; }
     .foot { margin:24px 0 0; color:#8998b2; font-size:.82rem; text-align:center; }
-    .foot a { color:#b9caff; }
+    .footer-link { border:0; padding:0; color:#b9caff; background:transparent; text-decoration:underline; font:inherit; font-size:inherit; cursor:pointer; }
     .overlay { position:fixed; inset:0; display:none; place-items:center; padding:18px; background:#050914d9; z-index:5; }
     .overlay.open { display:grid; }
     .dialog { width:min(100%,520px); max-height:min(85vh,700px); overflow:auto; padding:24px; border:1px solid #394b6a; border-radius:20px; background:#151f33; box-shadow:0 24px 90px #000a; }
@@ -67,7 +67,7 @@
           <span><strong>Linux users — choose a package</strong><small>AppImage · Debian / Ubuntu (.deb) · Fedora / openSUSE (.rpm)</small></span><span class="arrow" aria-hidden="true">＋</span>
         </button>
       </div>
-      <p class="foot">Bolt Browser is an independent project. View the <a href="https://github.com/niklas-h1y/Bolt-Browser" target="_blank" rel="noopener noreferrer">source repository</a> and <a href="https://github.com/niklas-h1y/Bolt-Browser/releases" target="_blank" rel="noopener noreferrer">releases</a>.</p>
+      <p class="foot">Bolt Browser is an independent project. <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser" data-title="Source repository">Copy source repository URL</button> · <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases" data-title="Releases">Copy releases URL</button>.</p>
     </section>
   </main>
 
