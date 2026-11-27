@@ -18,6 +18,14 @@
     .intro { margin:0; color:var(--muted); font-size:1.05rem; }
     .notice { margin:24px 0; padding:16px 18px; border:1px solid #31466b; border-radius:14px; background:#192844; color:#dce7ff; }
     .notice strong { color:#fff; }
+    .trust-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    .trust-item { padding:15px; border:1px solid var(--line); border-radius:13px; background:#101a2b; }
+    .trust-item strong { display:block; margin-bottom:4px; color:#eaf0ff; font-size:.94rem; }
+    .trust-item span { display:block; color:var(--muted); font-size:.84rem; }
+    .release-note { margin:16px 0 0; padding:13px 15px; border-left:3px solid #d5a64c; border-radius:8px; background:#282317; color:#f1dfb8; font-size:.88rem; }
+    .checksum { margin-top:14px; padding:14px; border:1px solid var(--line); border-radius:12px; background:#0d1524; }
+    .checksum strong { display:block; margin-bottom:7px; font-size:.9rem; }
+    .checksum code { display:block; color:#c8d6ff; font-size:.76rem; overflow-wrap:anywhere; user-select:all; }
     .downloads { display:grid; gap:12px; margin-top:26px; }
     button { font:inherit; cursor:pointer; }
     .download { width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 18px; border:1px solid var(--line); border-radius:14px; color:var(--text); background:#1b2740; text-align:left; transition:transform .15s,border-color .15s,background .15s; }
@@ -42,6 +50,7 @@
     .linux-choice:hover { border-color:#7698ff; }
     .linux-choice small { display:block; color:var(--muted); }
     .status { min-height:1.4em; margin-top:12px; color:#a9c0ff; font-size:.9rem; }
+    @media (max-width:520px) { .trust-grid { grid-template-columns:1fr; } }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
   </style>
 </head>
@@ -53,7 +62,22 @@
       <p class="intro">A browser built for everyday browsing, with useful tools for people who like to build for the web. If you enjoy the project, try it out and share it.</p>
 
       <div class="notice">
-        <strong>Is it safe?</strong> Bolt is an open-source project, and its source code and release files are published on GitHub. You can inspect the code before installing. Only download from the official Bolt Browser repository, check the permissions requested by any app, and remember that no software can be guaranteed risk-free.
+        <strong>Security and transparency</strong><br>
+        Bolt Browser is an independent, open-source project. Its source code, release downloads, and build workflows are available in the official GitHub repository, so you can review where the software comes from before installing it. The project has not been presented as independently security-audited, and no software can be guaranteed risk-free. Download only from the official project pages and review permissions before use.
+      </div>
+
+      <div class="trust-grid" aria-label="Project transparency">
+        <div class="trust-item"><strong>Public source code</strong><span>Review the code and project history on GitHub.</span></div>
+        <div class="trust-item"><strong>Visible build workflows</strong><span>Inspect the automated build steps for supported platforms.</span></div>
+        <div class="trust-item"><strong>Release downloads</strong><span>Use the project’s release page rather than third-party mirrors.</span></div>
+        <div class="trust-item"><strong>Security reporting</strong><span>Read the project security policy before reporting a vulnerability.</span></div>
+      </div>
+
+      <div class="release-note"><strong>Release status:</strong> The Windows v1.0.0 download is currently published as a GitHub pre-release. Please treat it as an early release and report problems through the project repository.</div>
+      <div class="checksum">
+        <strong>Windows installer SHA-256</strong>
+        <code>6ef2d3b6cbed9d21140e1a05bdd1adaa441bee8f4925d0e3f4673a0048969560</code>
+        <span style="display:block;margin-top:7px;color:var(--muted);font-size:.8rem">Compare this fingerprint with the installer you downloaded. A matching checksum helps detect file changes; it does not prove that the software is free of vulnerabilities.</span>
       </div>
 
       <div class="downloads" aria-label="Download options">
@@ -67,7 +91,11 @@
           <span><strong>Linux users — choose a package</strong><small>AppImage · Debian / Ubuntu (.deb) · Fedora / openSUSE (.rpm)</small></span><span class="arrow" aria-hidden="true">＋</span>
         </button>
       </div>
-      <p class="foot">Bolt Browser is an independent project. <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser" data-title="Source repository">Copy source repository URL</button> · <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases" data-title="Releases">Copy releases URL</button>.</p>
+      <p class="foot">Bolt Browser is an independent project.<br>
+        <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser" data-title="Source repository">Source code</button> ·
+        <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases" data-title="Official releases">Official releases</button> ·
+        <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/blob/main/SECURITY.md" data-title="Security policy">Security policy</button>
+      </p>
     </section>
   </main>
 
