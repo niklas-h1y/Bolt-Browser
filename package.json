@@ -28,10 +28,44 @@
   "build": {
     "appId": "com.bolt.browser",
     "productName": "Bolt Browser",
-    "files": ["main.js", "preload.js", "index.html", "newtab.html", "extensions.html", "icon.svg", "extensions/**/*"],
-    "directories": { "output": "dist" },
-    "win": { "target": ["nsis", "zip"] },
-    "mac": { "target": ["dmg", "zip"] },
-    "linux": { "target": ["AppImage", "deb"] }
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "newtab.html",
+      "extensions.html",
+      "icon.svg",
+      "extensions/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Bolt-Browser-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bolt Browser",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
