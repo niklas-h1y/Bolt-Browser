@@ -28,7 +28,7 @@
   "build": {
     "appId": "com.bolt.browser",
     "productName": "Bolt Browser",
-    "files": ["main.js", "preload.js", "index.html", "newtab.html", "icon.svg", "extensions/**/*"],
+    "files": ["main.js", "preload.js", "index.html", "newtab.html", "extensions.html", "icon.svg", "extensions/**/*"],
     "directories": { "output": "dist" },
     "win": { "target": ["nsis", "zip"] },
     "mac": { "target": ["dmg", "zip"] },

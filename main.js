@@ -8,6 +8,8 @@ let activeTabId = null;
 let nextTabId = 1;
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
+const extensionStorePath = () => path.join(app.getPath('userData'), 'extensions.json');
+let extensionPaths = [];
 
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
@@ -35,9 +37,17 @@ function activate(id) {
   send('page-state', { id, url: wc.getURL(), title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   publishTabs();
 }
+function isExtensionsUrl(value) {
+  return /^\s*(?:chrome|bolt):\/\/extensions\/?(?:[?#].*)?\s*$/i.test(String(value || ''));
+}
+function openExtensionsPage(webContents) {
+  if (!webContents || webContents.isDestroyed()) return;
+  webContents.loadFile(path.join(__dirname, 'extensions.html'));
+}
 function navigateTo(input) {
   const value = String(input || '').trim();
   if (!value) return '';
+  if (isExtensionsUrl(value)) return 'bolt://extensions';
   if (/^(https?:|file:|about:)/i.test(value)) return value;
   if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value) || /^localhost(:\d+)?/.test(value)) return 'https://' + value;
   return 'https://www.google.com/search?q=' + encodeURIComponent(value);
@@ -47,6 +57,7 @@ function createTab(url = 'bolt://newtab') {
   const view = new WebContentsView({
     webPreferences: {
       session: browserSession(),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false
@@ -68,10 +79,18 @@ function createTab(url = 'bolt://newtab') {
     if (id === activeTabId) send('page-state', { id, url: navigatedUrl, title: wc.getTitle(), canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
     publishTabs();
   });
-  wc.on('will-navigate', (_event, navigatedUrl) => send('navigation-started', { id, url: navigatedUrl }));
+  wc.on('will-navigate', (event, navigatedUrl) => {
+    if (isExtensionsUrl(navigatedUrl)) {
+      event.preventDefault();
+      openExtensionsPage(wc);
+      return;
+    }
+    send('navigation-started', { id, url: navigatedUrl });
+  });
   wc.on('render-process-gone', (_event, details) => send('browser-error', { id, message: 'A page process stopped: ' + details.reason }));
   activate(id);
   if (url === 'bolt://newtab') wc.loadFile(path.join(__dirname, 'newtab.html'));
+  else if (isExtensionsUrl(url)) openExtensionsPage(wc);
   else wc.loadURL(navigateTo(url));
   return id;
 }
@@ -98,25 +117,85 @@ function createWindow() {
   win.webContents.on('did-finish-load', () => createTab());
 }
 
+function saveExtensionPaths() {
+  fs.mkdirSync(path.dirname(extensionStorePath()), { recursive: true });
+  fs.writeFileSync(extensionStorePath(), JSON.stringify(extensionPaths, null, 2), 'utf8');
+}
+async function restoreExtensions() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(extensionStorePath(), 'utf8'));
+    extensionPaths = Array.isArray(saved) ? saved.filter(p => typeof p === 'string') : [];
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.error('Could not read saved extension paths:', error);
+    extensionPaths = [];
+  }
+  const validPaths = [];
+  for (const extensionPath of extensionPaths) {
+    try {
+      if (!fs.existsSync(path.join(extensionPath, 'manifest.json'))) continue;
+      await browserSession().extensions.loadExtension(extensionPath, { allowFileAccess: false });
+      validPaths.push(extensionPath);
+    } catch (error) {
+      console.error('Could not restore extension:', extensionPath, error);
+    }
+  }
+  extensionPaths = validPaths;
+  saveExtensionPaths();
+}
+function extensionSummary(extension) {
+  return { id: extension.id, name: extension.name, version: extension.version, description: extension.manifest?.description || '' };
+}
+function isExtensionsManagerSender(event) {
+  try {
+    const senderUrl = new URL(event.senderFrame.url);
+    return senderUrl.protocol === 'file:' && ['index.html', 'extensions.html'].includes(path.basename(senderUrl.pathname));
+  } catch (_) { return false; }
+}
+
 ipcMain.handle('tab:new', (_e, url) => createTab(url || 'bolt://newtab'));
 ipcMain.handle('tab:activate', (_e, id) => activate(Number(id)));
 ipcMain.handle('tab:close', (_e, id) => closeTab(Number(id)));
-ipcMain.handle('tab:navigate', (_e, input) => { const item = tabs.get(activeTabId); if (item) item.view.webContents.loadURL(navigateTo(input)); });
+ipcMain.handle('tab:navigate', (_e, input) => {
+  const item = tabs.get(activeTabId);
+  if (!item) return;
+  if (isExtensionsUrl(input)) openExtensionsPage(item.view.webContents);
+  else item.view.webContents.loadURL(navigateTo(input));
+});
 ipcMain.handle('tab:back', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
 ipcMain.handle('tab:forward', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); });
 ipcMain.handle('tab:reload', () => tabs.get(activeTabId)?.view.webContents.reload());
 ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
-ipcMain.handle('extensions:list', () => browserSession().getAllExtensions().map(x => ({ id: x.id, name: x.name, version: x.version })));
-ipcMain.handle('extensions:install', async () => {
+ipcMain.handle('extensions:list', (event) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
+  return browserSession().extensions.getAllExtensions().filter(extension => extension.manifest?.manifest_version === 3).map(extensionSummary);
+});
+ipcMain.handle('extensions:install', async (event) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
   const result = await dialog.showOpenDialog(win, { title: 'Select an unpacked Chromium extension folder', properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths[0]) return { canceled: true };
-  const manifestPath = path.join(result.filePaths[0], 'manifest.json');
+  const extensionPath = path.resolve(result.filePaths[0]);
+  const manifestPath = path.join(extensionPath, 'manifest.json');
   if (!fs.existsSync(manifestPath)) throw new Error('That folder does not contain manifest.json.');
-  const ext = await browserSession().loadExtension(result.filePaths[0], { allowFileAccess: false });
-  return { id: ext.id, name: ext.name, version: ext.version };
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (manifest.manifest_version !== 3) throw new Error('Only Manifest V3 extensions are supported.');
+  const extension = await browserSession().extensions.loadExtension(extensionPath, { allowFileAccess: false });
+  if (!extensionPaths.includes(extensionPath)) extensionPaths.push(extensionPath);
+  saveExtensionPaths();
+  return extensionSummary(extension);
 });
-ipcMain.handle('extensions:remove', async (_e, id) => { await browserSession().removeExtension(id); return true; });
+ipcMain.handle('extensions:remove', async (event, id) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
+  const extension = browserSession().extensions.getAllExtensions().find(item => item.id === id && item.manifest?.manifest_version === 3);
+  if (!extension) throw new Error('Extension not found.');
+  await browserSession().extensions.removeExtension(id);
+  if (extension.path) {
+    const removedPath = path.resolve(extension.path);
+    extensionPaths = extensionPaths.filter(extensionPath => path.resolve(extensionPath) !== removedPath);
+    saveExtensionPaths();
+  }
+  return true;
+});
 browserSession().on('will-download', (_event, item) => {
   const filename = item.getFilename();
   send('download-started', { filename, totalBytes: item.getTotalBytes() });
@@ -124,8 +203,9 @@ browserSession().on('will-download', (_event, item) => {
   item.once('done', (_e, state) => send('download-finished', { filename, state, path: item.getSavePath() }));
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   app.setAppUserModelId('com.bolt.browser');
+  await restoreExtensions();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

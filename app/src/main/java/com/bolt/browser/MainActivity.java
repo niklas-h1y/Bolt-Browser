@@ -191,6 +191,16 @@ public class MainActivity extends Activity {
         tab.view = new GeckoView(this);
         tab.session.open(runtime);
         tab.view.setSession(tab.session);
+        tab.session.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
+            @Override public GeckoResult<AllowOrDeny> onLoadRequest(GeckoSession session, LoadRequest request) {
+                String requested = request.uri == null ? "" : request.uri.trim();
+                if (requested.matches("(?i)^(chrome|bolt)://extensions/?(?:[?#].*)?$")) {
+                    runOnUiThread(() -> showExtensions());
+                    return GeckoResult.fromValue(AllowOrDeny.DENY);
+                }
+                return GeckoResult.fromValue(AllowOrDeny.ALLOW);
+            }
+        });
         tab.session.setContentDelegate(new GeckoSession.ContentDelegate() {
             @Override public void onTitleChange(GeckoSession session, String title) {
                 if (title != null && !title.trim().isEmpty()) tab.title = title;
@@ -269,6 +279,12 @@ public class MainActivity extends Activity {
     private void navigateFromAddress() {
         String value=address.getText().toString().trim();
         if(value.isEmpty()) return;
+        if(value.matches("(?i)^(chrome|bolt)://extensions/?(?:[?#].*)?$")) {
+            showExtensions();
+            ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(address.getWindowToken(),0);
+            address.clearFocus();
+            return;
+        }
         String url=value;
         if(!url.matches("(?i)^(https?://|file:|about:|resource:).*")) {
             if(url.matches("(?i)^([a-z0-9-]+\\.)+[a-z]{2,}(:[0-9]+)?(/.*)?$") || url.startsWith("localhost")) url="https://"+url;
