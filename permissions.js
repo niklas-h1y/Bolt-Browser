@@ -1,4 +1,4 @@
-const { dialog, desktopCapturer } = require('electron');
+const { dialog, desktopCapturer, systemPreferences } = require('electron');
 
 const DEFAULTS = {
   camera: true, cameraPtz: true, microphone: true, screenShare: true, geolocation: true, geolocationApproximate: true,
@@ -83,8 +83,15 @@ function configurePermissions({ ses, getWindow, getSettings }) {
         if ((wantsVideo && !enabled('camera')) || (wantsAudio && !enabled('microphone')) || (!wantsVideo && !wantsAudio)) return done(false);
         const kinds = [wantsVideo && 'camera', wantsAudio && 'microphone'].filter(Boolean).join(' and ');
         const response = await ask('Allow ' + kinds + '?', origin + ' wants to use your ' + kinds + '.');
-        if (response === 0) { if (wantsVideo) grant(origin, 'media:video'); if (wantsAudio) grant(origin, 'media:audio'); done(true); }
-        else done(false);
+        if (response !== 0) return done(false);
+        // macOS requires a separate TCC consent in addition to the website permission.
+        if (process.platform === 'darwin') {
+          if (wantsVideo && !(await systemPreferences.askForMediaAccess('camera'))) return done(false);
+          if (wantsAudio && !(await systemPreferences.askForMediaAccess('microphone'))) return done(false);
+        }
+        if (wantsVideo) grant(origin, 'media:video');
+        if (wantsAudio) grant(origin, 'media:audio');
+        done(true);
         return;
       }
       const toggle = permissionToggle[permission];
