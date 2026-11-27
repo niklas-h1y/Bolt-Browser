@@ -169,7 +169,7 @@ async function restoreExtensions() {
   saveExtensionPaths();
 }
 function extensionSummary(extension) {
-  return { id: extension.id, name: extension.name, version: extension.version, description: extension.manifest?.description || '' };
+  return { id: extension.id, name: extension.name, version: extension.version, description: extension.manifest?.description || '', hasPopup: Boolean(extension.manifest?.action?.default_popup || extension.manifest?.browser_action?.default_popup) };
 }
 function isExtensionsManagerSender(event) {
   try {
