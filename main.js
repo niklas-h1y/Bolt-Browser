@@ -9,6 +9,12 @@ let overlayOpen = false;
 let nextTabId = 1;
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
+// Electron 35+ exposes extension methods on ses.extensions; older versions expose them on ses.
+const browserExtensions = () => {
+  const ses = browserSession();
+  const extApi = ses.extensions || ses;
+  return extApi;
+};
 const extensionStorePath = () => path.join(app.getPath('userData'), 'extensions.json');
 let extensionPaths = [];
 
@@ -152,7 +158,7 @@ async function restoreExtensions() {
   for (const extensionPath of extensionPaths) {
     try {
       if (!fs.existsSync(path.join(extensionPath, 'manifest.json'))) continue;
-      await browserSession().extensions.loadExtension(extensionPath, { allowFileAccess: false });
+      await browserExtensions().loadExtension(extensionPath, { allowFileAccess: false });
       validPaths.push(extensionPath);
     } catch (error) {
       console.error('Could not restore extension:', extensionPath, error);
@@ -191,7 +197,7 @@ ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webCon
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
 ipcMain.handle('extensions:list', (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
-  return browserSession().extensions.getAllExtensions().filter(extension => extension.manifest?.manifest_version === 3).map(extensionSummary);
+  return browserExtensions().getAllExtensions().filter(extension => extension.manifest?.manifest_version === 3).map(extensionSummary);
 });
 ipcMain.handle('extensions:install', async (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
@@ -202,16 +208,16 @@ ipcMain.handle('extensions:install', async (event) => {
   if (!fs.existsSync(manifestPath)) throw new Error('That folder does not contain manifest.json.');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   if (manifest.manifest_version !== 3) throw new Error('Only Manifest V3 extensions are supported.');
-  const extension = await browserSession().extensions.loadExtension(extensionPath, { allowFileAccess: false });
+  const extension = await browserExtensions().loadExtension(extensionPath, { allowFileAccess: false });
   if (!extensionPaths.includes(extensionPath)) extensionPaths.push(extensionPath);
   saveExtensionPaths();
   return extensionSummary(extension);
 });
 ipcMain.handle('extensions:remove', async (event, id) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
-  const extension = browserSession().extensions.getAllExtensions().find(item => item.id === id && item.manifest?.manifest_version === 3);
+  const extension = browserExtensions().getAllExtensions().find(item => item.id === id && item.manifest?.manifest_version === 3);
   if (!extension) throw new Error('Extension not found.');
-  await browserSession().extensions.removeExtension(id);
+  await browserExtensions().removeExtension(id);
   if (extension.path) {
     const removedPath = path.resolve(extension.path);
     extensionPaths = extensionPaths.filter(extensionPath => path.resolve(extensionPath) !== removedPath);
