@@ -21,6 +21,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     listExtensions: () => invoke('extensions:list'),
     installExtension: () => invoke('extensions:install'),
     removeExtension: id => invoke('extensions:remove', id),
+    openExtensionPopup: id => invoke('extensions:open-popup', id),
     openDownloads: () => invoke('download:open-folder'),
     on: (channel, callback) => {
       const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished'];
