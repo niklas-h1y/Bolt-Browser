@@ -127,6 +127,10 @@ function createTab(url = 'bolt://newtab') {
   if (extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
   attachDevToolsShortcut(wc);
   if (permissionManager) permissionManager.attachWebContents(wc);
+  wc.on('context-menu', (_event, params) => {
+    const items = extensionManager?.getContextMenuItems(wc, params) || [];
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win, x: params.x, y: params.y });
+  });
   wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (permissionManager) permissionManager.attachWebContents(childWindow.webContents); } });
   wc.setWindowOpenHandler(({ url, features }) => {
     let target;
