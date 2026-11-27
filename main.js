@@ -27,7 +27,7 @@ let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
 let shieldEnabled = true;
 let blockedRequestCount = 0;
 let shieldRequestListener = null;
-let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab', newTabBackground: 'default' };
+let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab', newTabBackground: 'default', restoreSession: true };
 let sessionSaveTimer = null;
 let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
@@ -189,6 +189,7 @@ function sessionSafeUrl(webContents) {
 }
 function saveSessionNow() {
   if (isRestoringSession) return;
+  if (!uiSettings.restoreSession) { try { fs.rmSync(sessionPath(), { force: true }); } catch (_) {} return; }
   try {
     const entries = [...tabs.entries()].map(([id, item]) => ({
       url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab',
@@ -205,6 +206,7 @@ function scheduleSessionSave() {
   sessionSaveTimer = setTimeout(saveSessionNow, 350);
 }
 function restoreSession() {
+  if (!uiSettings.restoreSession) { createTab(); return; }
   let saved;
   try { saved = JSON.parse(fs.readFileSync(sessionPath(), 'utf8')); } catch (_) { saved = null; }
   const entries = Array.isArray(saved?.tabs) ? saved.tabs.slice(0, 50) : [];
@@ -612,7 +614,9 @@ ipcMain.handle('settings:set-ui', (event, next) => {
   const searchEngine = engines.includes(next.searchEngine) ? next.searchEngine : uiSettings.searchEngine;
   const backgrounds = ['default','aurora','ocean','sunset','forest'];
   const newTabBackground = backgrounds.includes(next.newTabBackground) ? next.newTabBackground : uiSettings.newTabBackground;
-  uiSettings = { ...uiSettings, theme, accent, searchEngine, startup: 'newtab', newTabBackground };
+  const restoreSession = typeof next.restoreSession === 'boolean' ? next.restoreSession : uiSettings.restoreSession;
+  uiSettings = { ...uiSettings, theme, accent, searchEngine, startup: 'newtab', newTabBackground, restoreSession };
+  if (!restoreSession) { try { fs.rmSync(sessionPath(), { force: true }); } catch (_) {} }
   saveSettings();
   publishUiSettings();
   return { ...uiSettings };
