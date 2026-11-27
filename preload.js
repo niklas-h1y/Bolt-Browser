@@ -26,7 +26,7 @@ if (window.location.protocol === 'https:' && window.location.hostname === 'chrom
     });
   };
   enableStoreInstallButton();
-  new MutationObserver(enableStoreInstallButton).observe(document.documentElement, {
+  new MutationObserver(enableStoreInstallButton).observe(document, {
     childList: true, subtree: true, attributes: true,
     attributeFilter: ['disabled', 'aria-disabled']
   });
