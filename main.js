@@ -5,6 +5,7 @@ const fs = require('node:fs');
 let win;
 let tabs = new Map();
 let activeTabId = null;
+let overlayOpen = false;
 let nextTabId = 1;
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
@@ -39,7 +40,7 @@ function layoutViews() {
   const { width, height } = win.getContentBounds();
   for (const [id, item] of tabs) {
     item.view.setBounds({ x: 0, y: 116, width, height: Math.max(100, height - 140) });
-    item.view.setVisible(id === activeTabId);
+    item.view.setVisible(id === activeTabId && !overlayOpen);
   }
 }
 function activate(id) {
@@ -170,6 +171,10 @@ function isExtensionsManagerSender(event) {
   } catch (_) { return false; }
 }
 
+ipcMain.handle('tab:overlay', (_e, isOpen) => {
+  overlayOpen = Boolean(isOpen);
+  layoutViews();
+});
 ipcMain.handle('tab:new', (_e, url) => createTab(url || 'bolt://newtab'));
 ipcMain.handle('tab:activate', (_e, id) => activate(Number(id)));
 ipcMain.handle('tab:close', (_e, id) => closeTab(Number(id)));
