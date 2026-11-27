@@ -4,8 +4,10 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111210"><title>New tab · Bolt</title>
 <style>
-:root{color-scheme:dark;--bg:#111210;--panel:#191b18;--line:#30342d;--text:#f2f4ed;--muted:#92988c;--accent:#b8f36b;--accent-ink:#17200d}
-:root[data-theme="light"]{color-scheme:light;--bg:#f6f7f3;--panel:#fff;--line:#dfe3d8;--text:#20251d;--muted:#747c6c}
+ :root{color-scheme:dark;--bg:#111210;--panel:#191b18;--line:#30342d;--text:#f2f4ed;--muted:#92988c;--accent:#b8f36b;--accent-ink:#17200d}
+:root[data-theme="midnight-neon"]{color-scheme:dark;--bg:#090b18;--panel:#11152a;--line:#2b3562;--text:#edf3ff;--muted:#98a6ca;--accent:#8bd5ff;--accent-ink:#10202a}
+:root[data-theme="oled-black"]{color-scheme:dark;--bg:#000;--panel:#080808;--line:#292929;--text:#f5f5f5;--muted:#a0a0a0;--accent:#b8f36b;--accent-ink:#101010}
+:root[data-theme="clean-light"]{color-scheme:light;--bg:#f6f7f3;--panel:#fff;--line:#dfe3d8;--text:#20251d;--muted:#747c6c;--accent-ink:#17200d}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:14px Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;transition:background .2s,color .2s}
 header{height:64px;padding:0 34px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.1px}.mark{width:25px;height:25px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:16px}.header-note{color:var(--muted);font-size:11px;letter-spacing:1.5px}
 main{width:min(680px,calc(100% - 36px));margin:auto;text-align:center;padding:55px 0 90px}.eyebrow{color:var(--muted);font-size:11px;letter-spacing:2.4px;text-transform:uppercase;margin-bottom:18px}.clock{font-size:clamp(38px,8vw,58px);font-weight:600;letter-spacing:-3px;line-height:1.05;font-variant-numeric:tabular-nums}.date{margin-top:10px;color:var(--muted);font-size:13px}.headline{font-size:clamp(28px,5vw,39px);letter-spacing:-1.8px;font-weight:550;margin:38px 0 8px}.headline span{color:var(--accent)}.sub{color:var(--muted);margin:0 0 28px}
@@ -32,12 +34,9 @@ footer{display:flex;justify-content:center;gap:8px;padding:18px;color:var(--mute
 <script>
 const $=s=>document.querySelector(s);
 let prefs={};try{prefs=JSON.parse(localStorage.getItem('bolt-settings')||'{}')}catch{}
-const theme=prefs.theme==='system'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):(prefs.theme||'dark');
-if(theme==='light')document.documentElement.dataset.theme='light';
+const legacy={dark:'bolt-dark',light:'clean-light',system:'bolt-dark'};const theme=legacy[prefs.theme]||prefs.theme||'bolt-dark';document.documentElement.dataset.theme=theme;
 if(prefs.accent)document.documentElement.style.setProperty('--accent',prefs.accent);
-if(prefs.accent==='#8bd5ff')document.documentElement.style.setProperty('--accent-ink','#10202a');
-if(prefs.accent==='#d3a6ff')document.documentElement.style.setProperty('--accent-ink','#241331');
-if(prefs.accent==='#ffb58a')document.documentElement.style.setProperty('--accent-ink','#2a170d');
+document.documentElement.style.setProperty('--accent-ink',prefs.accent==='#8bd5ff'?'#10202a':prefs.accent==='#d3a6ff'?'#241331':prefs.accent==='#ffb58a'?'#2a170d':'#17200d');
 function tick(){const d=new Date();$('#clock').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});$('#date').textContent=d.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric',year:'numeric'})}tick();setInterval(tick,15000);
 $('#search').addEventListener('submit',e=>{e.preventDefault();const q=$('#query').value.trim();if(!q)return;const isUrl=/^(https?:\/\/|file:|about:)/i.test(q)||/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(q)||/^localhost(:\d+)?/.test(q);const engines={google:'https://www.google.com/search?q=',duckduckgo:'https://duckduckgo.com/?q=',bing:'https://www.bing.com/search?q='};location.href=isUrl?( /^(https?:|file:|about:)/i.test(q)?q:'https://'+q):(engines[prefs.searchEngine||'google']+encodeURIComponent(q))});
 </script></body></html>
