@@ -12,11 +12,11 @@ The desktop edition loads **unpacked Chromium extensions using Manifest V3** and
 - `manifest_version: 3`.
 - Content scripts declared with `content_scripts`.
 - Browser action icons and popups in Bolt's toolbar, including per-tab badges and dynamic action state.
-- Common extension APIs including `chrome.tabs`, `chrome.windows`, `chrome.runtime`, `chrome.storage`, `chrome.cookies`, `chrome.contextMenus`, `chrome.notifications`, and `chrome.webNavigation`, subject to the library's supported API list and Electron limitations.
+- Common extension APIs including `chrome.tabs`, `chrome.runtime`, `chrome.storage`, `chrome.cookies`, `chrome.contextMenus`, `chrome.notifications`, and `chrome.webNavigation`, subject to the library's supported API list and Electron limitations. Basic `chrome.windows` queries are provided by the library; `chrome.windows.create` is not yet connected to Bolt's single-window UI.
 - Extension-created tabs are integrated with Bolt's tab strip; action context-menu items are shown in the page context menu.
 - Static assets (JavaScript, CSS, icons) referenced with paths relative to the extension folder.
 
-Open `chrome://extensions` or `bolt://extensions` in the desktop address bar to open Bolt's built-in Extensions manager. Choose **Load unpacked** and select the folder containing `manifest.json`. The manager lists each loaded extension's name, version, ID and description and lets you remove it. Loaded extensions are also restored after restart. Manually loaded extension folder paths are saved in Electron's user data directory and restored when Bolt starts again.
+Open `chrome://extensions` or `bolt://extensions` in the desktop address bar to open Bolt's built-in Extensions manager. Choose **Load unpacked** and select the folder containing `manifest.json`. The manager lists each loaded extension's name, version, ID and description and lets you remove it. Manually loaded extension folder paths are saved in Electron's user data directory and restored when Bolt starts again. Bolt displays the declared permissions before installation and asks again when an extension requests optional permissions.
 
 ### Android (Mozilla GeckoView / Firefox engine)
 
