@@ -9,7 +9,11 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
   contextBridge.exposeInMainWorld('boltExtensions', {
     list: () => invoke('extensions:list'),
     installUnpacked: () => invoke('extensions:install'),
-    remove: id => invoke('extensions:remove', id)
+    remove: id => invoke('extensions:remove', id),
+    installCrxFile: () => invoke('extensions:install-crx-file'),
+    installCrxUrl: input => invoke('extensions:install-crx-url', input),
+    getShieldState: () => invoke('shield:get-state'),
+    setShieldEnabled: enabled => invoke('shield:set-enabled', enabled)
   });
 } else if (window.location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('bolt', {
@@ -30,7 +34,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
-      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed'];
+      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count'];
       if (allowed.includes(channel)) ipcRenderer.on(channel, (_event, data) => callback(data));
     }
   });
