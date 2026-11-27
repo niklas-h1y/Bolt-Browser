@@ -2,6 +2,9 @@ const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, she
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
+const crypto = require('node:crypto');
+const os = require('node:os');
+const extractZip = require('extract-zip');
 const { configurePermissions, DEFAULTS: DEFAULT_PERMISSION_SETTINGS } = require('./permissions');
 const { ElectronChromeExtensions } = require('electron-chrome-extensions');
 
@@ -19,10 +22,38 @@ let chromeHidden = false;
 let permissionManager;
 let extensionManager;
 let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
+let shieldEnabled = true;
+let blockedRequestCount = 0;
+let shieldRequestListener = null;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
-function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; } catch (_) {} }
-function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings }, null, 2), 'utf8'); }
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; shieldEnabled = saved.shieldEnabled !== false; } catch (_) {} }
+function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, shieldEnabled }, null, 2), 'utf8'); }
+function isBlockedAdRequest(rawUrl) {
+  try {
+    const u = new URL(rawUrl); const host = u.hostname.toLowerCase(); const pathName = u.pathname.toLowerCase();
+    const domains = ['doubleclick.net','googlesyndication.com','google-analytics.com','googletagmanager.com','googleadservices.com','adnxs.com','taboola.com','outbrain.com','scorecardresearch.com','adform.net','adroll.com','criteo.com','adsrvr.org','rubiconproject.com','pubmatic.com','openx.net','casalemedia.com','demdex.net','quantserve.com','quantserve.com','hotjar.com','segment.io','segment.com','mixpanel.com','amplitude.com','branch.io','appsflyer.com','adjust.com','pixel.facebook.com','connect.facebook.net','facebook.net'];
+    if (domains.some(domain => host === domain || host.endsWith('.' + domain))) return true;
+    if (host === 'facebook.net' && pathName.startsWith('/tr')) return true;
+    return /(?:^|\\/)(?:ads?|adserver|adservice|analytics|tracking|track|pixel|beacon)(?:[._/-]|$)/i.test(pathName) && /(?:pixel|track|analytics|beacon)/i.test(pathName);
+  } catch (_) { return false; }
+}
+function configureShield(ses) {
+  if (shieldRequestListener) ses.webRequest.onBeforeRequest(null);
+  shieldRequestListener = (details, callback) => {
+    const blocked = shieldEnabled && isBlockedAdRequest(details.url);
+    if (blocked) { blockedRequestCount += 1; send('shield-count', blockedRequestCount); }
+    callback({ cancel: blocked });
+  };
+  ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, shieldRequestListener);
+  send('shield-state', { enabled: shieldEnabled, blocked: blockedRequestCount });
+}
+function setShieldEnabled(enabled) {
+  shieldEnabled = Boolean(enabled); saveSettings();
+  if (!shieldEnabled) blockedRequestCount = 0;
+  send('shield-state', { enabled: shieldEnabled, blocked: blockedRequestCount });
+  return { enabled: shieldEnabled, blocked: blockedRequestCount };
+}
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
 // Electron 35+ exposes extension methods on ses.extensions; older versions expose them on ses.
@@ -233,6 +264,95 @@ async function restoreExtensions() {
   extensionPaths = validPaths;
   saveExtensionPaths();
 }
+function readProtoFields(buffer) {
+  const fields = []; let offset = 0;
+  const varint = () => { let value = 0n, shift = 0n; while (offset < buffer.length) { const byte = buffer[offset++]; value |= BigInt(byte & 0x7f) << shift; if (!(byte & 0x80)) return Number(value); shift += 7n; if (shift > 63n) throw new Error('Invalid CRX3 protobuf varint.'); } throw new Error('Truncated CRX3 protobuf.'); };
+  while (offset < buffer.length) {
+    const tag = varint(), field = tag >>> 3, wire = tag & 7;
+    if (wire === 0) fields.push({ field, wire, value: varint() });
+    else if (wire === 2) { const length = varint(); if (length < 0 || offset + length > buffer.length) throw new Error('Invalid CRX3 protobuf length.'); fields.push({ field, wire, value: buffer.subarray(offset, offset + length) }); offset += length; }
+    else if (wire === 1) { fields.push({ field, wire, value: buffer.subarray(offset, offset + 8) }); offset += 8; }
+    else if (wire === 5) { fields.push({ field, wire, value: buffer.subarray(offset, offset + 4) }); offset += 4; }
+    else throw new Error('Unsupported CRX3 protobuf wire type.');
+  }
+  return fields;
+}
+function crxIdFromBytes(bytes) { return [...bytes].map(byte => String.fromCharCode(97 + (byte >> 4), 97 + (byte & 15))).join(''); }
+function parseCrx3(buffer) {
+  if (buffer.length < 16 || buffer.toString('ascii', 0, 4) !== 'Cr24' || buffer.readUInt32LE(4) !== 3) throw new Error('Only valid CRX3 packages are supported.');
+  const headerLength = buffer.readUInt32LE(8), payloadOffset = 12 + headerLength;
+  if (!headerLength || payloadOffset >= buffer.length) throw new Error('Invalid CRX3 header length.');
+  const header = buffer.subarray(12, payloadOffset), payload = buffer.subarray(payloadOffset);
+  if (payload[0] !== 0x50 || payload[1] !== 0x4b) throw new Error('CRX3 package does not contain a ZIP payload.');
+  const headerFields = readProtoFields(header);
+  const signedData = headerFields.find(field => field.field === 10000 && field.wire === 2)?.value;
+  const signedFields = signedData ? readProtoFields(signedData) : [];
+  const crxId = signedFields.find(field => field.field === 1 && field.wire === 2)?.value;
+  if (!crxId || crxId.length !== 16) throw new Error('CRX3 package is missing its extension ID.');
+  const id = crxIdFromBytes(crxId);
+  let publicKey = null, signature = null;
+  for (const field of headerFields.filter(item => (item.field === 2 || item.field === 3) && item.wire === 2)) {
+    const pair = readProtoFields(field.value);
+    publicKey ||= pair.find(item => item.field === 1 && item.wire === 2)?.value || null;
+    signature ||= pair.find(item => item.field === 2 && item.wire === 2)?.value || null;
+  }
+  if (!publicKey || !signature || !signedData) throw new Error('CRX3 package is missing its signature data.');
+  const derivedId = crypto.createHash('sha256').update(publicKey).digest().subarray(0, 16);
+  if (crxIdFromBytes(derivedId) !== id) throw new Error('CRX3 public key does not match its extension ID.');
+  const signedBytes = Buffer.concat([signedData, crxId, payload]);
+  const valid = crypto.verify('sha256', signedBytes, { key: publicKey, format: 'der', type: 'spki' }, signature);
+  if (!valid) throw new Error('CRX3 signature verification failed. The package may be corrupted or tampered with.');
+  return { id, publicKey: publicKey.toString('base64'), payload };
+}
+async function installCrxBuffer(buffer, expectedId) {
+  const parsed = parseCrx3(buffer);
+  if (expectedId && parsed.id !== expectedId) throw new Error('Downloaded extension ID does not match the requested ID.');
+  const root = path.join(app.getPath('userData'), 'installed-extensions');
+  const target = path.join(root, parsed.id);
+  fs.mkdirSync(root, { recursive: true });
+  const tempZip = path.join(os.tmpdir(), 'bolt-' + parsed.id + '-' + Date.now() + '.zip');
+  const staging = target + '.extracting-' + process.pid;
+  try {
+    fs.rmSync(staging, { recursive: true, force: true });
+    fs.writeFileSync(tempZip, parsed.payload);
+    await extractZip(tempZip, { dir: staging });
+    const manifestPath = path.join(staging, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) throw new Error('CRX3 archive has no manifest.json.');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (manifest.manifest_version !== 3) throw new Error('Only Manifest V3 extensions are supported by Bolt.');
+    manifest.key = parsed.publicKey;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.renameSync(staging, target);
+    const extension = await browserExtensions().loadExtension(target, { allowFileAccess: false });
+    if (extension.id !== parsed.id) {
+      await browserExtensions().removeExtension(extension.id);
+      fs.rmSync(target, { recursive: true, force: true });
+      throw new Error('Electron loaded a different extension ID than the signed CRX3 package.');
+    }
+    if (!extensionPaths.includes(target)) extensionPaths.push(target);
+    saveExtensionPaths();
+    return extensionSummary(extension);
+  } catch (error) { fs.rmSync(staging, { recursive: true, force: true }); throw error; }
+  finally { fs.rmSync(tempZip, { force: true }); }
+}
+async function downloadCrxById(id) {
+  if (!/^[a-p]{32}$/.test(id)) throw new Error('Enter a valid 32-character Chrome extension ID.');
+  const endpoint = 'https://clients2.google.com/service/update2/crx?response=redirect&prodversion=131.0.0.0&acceptformat=crx2,crx3&x=id%3D' + id + '%26uc';
+  const response = await net.fetch(endpoint, { redirect: 'follow' });
+  if (!response.ok) throw new Error('Google update service returned HTTP ' + response.status + '.');
+  return installCrxBuffer(Buffer.from(await response.arrayBuffer()), id);
+}
+function extractChromeExtensionId(input) {
+  const value = String(input || '').trim();
+  if (/^[a-p]{32}$/.test(value)) return value;
+  let parsed; try { parsed = new URL(value); } catch (_) { throw new Error('Paste a Chrome Web Store URL or a 32-character extension ID.'); }
+  if (!['https:'].includes(parsed.protocol) || !['chromewebstore.google.com','chrome.google.com'].includes(parsed.hostname)) throw new Error('Only official Chrome Web Store URLs are accepted.');
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  const id = parts.find(part => /^[a-p]{32}$/.test(part));
+  if (!id) throw new Error('Could not find a 32-character extension ID in that Web Store URL.');
+  return id;
+}
 function extensionSummary(extension) {
   return { id: extension.id, name: extension.name, version: extension.version, description: extension.manifest?.description || '', hasPopup: Boolean(extension.manifest?.action?.default_popup || extension.manifest?.browser_action?.default_popup) };
 }
@@ -261,6 +381,8 @@ ipcMain.handle('tab:forward', () => { const wc = tabs.get(activeTabId)?.view.web
 ipcMain.handle('tab:reload', () => tabs.get(activeTabId)?.view.webContents.reload());
 ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
+ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
+ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
 ipcMain.handle('settings:get-permissions', (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
   return { ...permissionSettings };
@@ -301,6 +423,22 @@ ipcMain.handle('extensions:install', async (event) => {
   if (!extensionPaths.includes(extensionPath)) extensionPaths.push(extensionPath);
   saveExtensionPaths();
   return extensionSummary(extension);
+});
+ipcMain.handle('extensions:install-crx-file', async event => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
+  const result = await dialog.showOpenDialog(win, { title: 'Select a Chrome CRX3 package', properties: ['openFile'], filters: [{ name: 'Chrome extension package', extensions: ['crx'] }] });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true };
+  const buffer = fs.readFileSync(result.filePaths[0]);
+  const installed = await installCrxBuffer(buffer);
+  const approval = await dialog.showMessageBox(win, { type: 'warning', title: 'Extension installed', message: 'Installed ' + installed.name + '.', detail: 'Only use extensions from sources you trust. Review the extension permissions in the extensions manager.', buttons: ['OK'], noLink: true });
+  return installed;
+});
+ipcMain.handle('extensions:install-crx-url', async (event, input) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
+  const id = extractChromeExtensionId(input);
+  const approval = await dialog.showMessageBox(win, { type: 'warning', title: 'Install Chrome Web Store extension?', message: 'Download and install extension ' + id + '?', detail: 'The package will be fetched from Google’s official update service. Extension permissions can provide broad access to websites and data.', buttons: ['Cancel', 'Download and install'], defaultId: 0, cancelId: 0, noLink: true });
+  if (approval.response !== 1) return { canceled: true };
+  return downloadCrxById(id);
 });
 ipcMain.handle('extensions:open-popup', async (event, id) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
@@ -347,6 +485,7 @@ app.whenReady().then(async () => {
   // Session access is only valid after Electron has emitted app 'ready'.
   loadSettings();
   const ses = browserSession();
+  configureShield(ses);
   permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
   extensionManager = new ElectronChromeExtensions({
     session: ses,
