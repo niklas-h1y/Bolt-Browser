@@ -19,7 +19,7 @@ main{width:min(920px,calc(100% - 40px));margin:56px auto}.top{display:flex;align
 </main>
 <script>
 const list=document.getElementById('list'),status=document.getElementById('status'),load=document.getElementById('load'),installCrx=document.getElementById('installCrx');
-try{const prefs=JSON.parse(localStorage.getItem('bolt-settings')||'{}');const legacy={dark:'bolt-dark',light:'clean-light',system:'bolt-dark'};document.documentElement.dataset.theme=legacy[prefs.theme]||prefs.theme||'bolt-dark';if(prefs.accent)document.documentElement.style.setProperty('--accent',prefs.accent);document.documentElement.style.setProperty('--accent-ink',prefs.accent==='#8bd5ff'?'#10202a':prefs.accent==='#d3a6ff'?'#241331':prefs.accent==='#ffb58a'?'#2a170d':'#17200d')}catch{}
+function applyExtensionTheme(prefs){const legacy={dark:'bolt-dark',light:'clean-light',system:'bolt-dark'};document.documentElement.dataset.theme=legacy[prefs.theme]||prefs.theme||'bolt-dark';if(prefs.accent)document.documentElement.style.setProperty('--accent',prefs.accent);document.documentElement.style.setProperty('--accent-ink',prefs.accent==='#8bd5ff'?'#10202a':prefs.accent==='#d3a6ff'?'#241331':prefs.accent==='#ffb58a'?'#2a170d':'#17200d')}try{const prefs=JSON.parse(localStorage.getItem('bolt-settings')||'{}');applyExtensionTheme(prefs)}catch{}if(window.boltExtensions?.getUiSettings)window.boltExtensions.getUiSettings().then(applyExtensionTheme).catch(()=>{})
 function message(text){status.textContent=text}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function refresh(){
