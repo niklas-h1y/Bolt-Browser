@@ -28,12 +28,13 @@ function deviceLabel(device, type) {
 function deviceKey(origin, type, device) {
   return [origin, type, device.vendorId ?? '', device.productId ?? '', device.serialNumber ?? '', device.deviceId ?? device.portId ?? ''].join('|');
 }
-function configurePermissions({ ses, getWindow, getSettings }) {
+function configurePermissions({ ses, getWindow, getSettings, getSiteOverrides = () => ({}) }) {
   const grants = new Set();
   const deviceGrants = new Set();
   const settings = () => ({ ...DEFAULTS, ...(getSettings() || {}) });
   const enabled = key => settings()[key] === true;
   const hasGrant = (origin, permission) => grants.has(origin + '|' + permission);
+  const siteDecision = (origin, permission) => { const value = getSiteOverrides()?.[origin]?.[permission]; return typeof value === 'boolean' ? value : null; };
   const grant = (origin, permission) => { if (origin) grants.add(origin + '|' + permission); };
 
   async function ask(title, message, buttons = ['Allow once', 'Block']) {
@@ -59,9 +60,9 @@ function configurePermissions({ ses, getWindow, getSettings }) {
     if (permission === 'media') {
       const type = details.mediaType;
       const allowed = [];
-      if (type === 'video' || type === 'unknown') allowed.push(enabled('camera'));
-      if (type === 'audio' || type === 'unknown') allowed.push(enabled('microphone'));
-      return allowed.length > 0 && allowed.every(Boolean) && hasGrant(origin, 'media:' + type);
+      if (type === 'video' || type === 'unknown') allowed.push(enabled('camera') && (siteDecision(origin, 'camera') ?? hasGrant(origin, 'media:video')));
+      if (type === 'audio' || type === 'unknown') allowed.push(enabled('microphone') && (siteDecision(origin, 'microphone') ?? hasGrant(origin, 'media:audio')));
+      return allowed.length > 0 && allowed.every(Boolean);
     }
     const toggle = permissionToggle[permission];
     if (!toggle || !enabled(toggle)) return false;
@@ -80,9 +81,10 @@ function configurePermissions({ ses, getWindow, getSettings }) {
         const types = Array.isArray(details.mediaTypes) ? details.mediaTypes : (details.mediaType && details.mediaType !== 'unknown' ? [details.mediaType] : []);
         const wantsVideo = types.includes('video');
         const wantsAudio = types.includes('audio');
-        if ((wantsVideo && !enabled('camera')) || (wantsAudio && !enabled('microphone')) || (!wantsVideo && !wantsAudio)) return done(false);
+        if ((wantsVideo && (!enabled('camera') || siteDecision(origin, 'camera') === false)) || (wantsAudio && (!enabled('microphone') || siteDecision(origin, 'microphone') === false)) || (!wantsVideo && !wantsAudio)) return done(false);
         const kinds = [wantsVideo && 'camera', wantsAudio && 'microphone'].filter(Boolean).join(' and ');
-        const response = await ask('Allow ' + kinds + '?', origin + ' wants to use your ' + kinds + '.');
+        const preapproved = (!wantsVideo || siteDecision(origin, 'camera') === true) && (!wantsAudio || siteDecision(origin, 'microphone') === true);
+        const response = preapproved ? 0 : await ask('Allow ' + kinds + '?', origin + ' wants to use your ' + kinds + '.');
         if (response !== 0) return done(false);
         // macOS requires a separate TCC consent in addition to the website permission.
         if (process.platform === 'darwin') {
@@ -96,6 +98,9 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       }
       const toggle = permissionToggle[permission];
       if (!toggle || !enabled(toggle) || (permission === 'camera-pan-tilt-zoom' && !enabled('camera'))) return done(false);
+      const decision = siteDecision(origin, permission);
+      if (decision === false) return done(false);
+      if (decision === true) { grant(origin, permission); return done(true); }
       const names = {
         geolocation: 'location', 'geolocation-approximate': 'approximate location', nfc: 'NFC', accelerometer: 'motion sensors', gyroscope: 'motion sensors', magnetometer: 'motion sensors', pointerLock: 'pointer lock', keyboardLock: 'keyboard lock', fullscreen: 'fullscreen', 'automatic-fullscreen': 'automatic fullscreen', notifications: 'desktop notifications', midi: 'MIDI', midiSysex: 'MIDI system-exclusive access', 'local-fonts': 'local font access', 'window-management': 'screen enumeration', mediaKeySystem: 'protected media playback (DRM)',
         'display-capture': 'screen sharing', 'clipboard-read': 'read clipboard',
