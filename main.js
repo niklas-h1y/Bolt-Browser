@@ -32,6 +32,19 @@ let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || nu
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; } catch (_) {} }
 function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, shieldEnabled, uiSettings }, null, 2), 'utf8'); }
+function isChromeWebStoreRequest(details) {
+  try {
+    const requestUrl = new URL(details.url);
+    const initiator = details.initiator ? new URL(details.initiator) : null;
+    // Do not interfere with the Web Store document or resources it loads.
+    // The Store uses multiple Google-owned origins for its application bundle,
+    // account state, images, and extension metadata.
+    return requestUrl.hostname === 'chromewebstore.google.com'
+      || requestUrl.hostname === 'chrome.google.com'
+      || initiator?.hostname === 'chromewebstore.google.com'
+      || initiator?.hostname === 'chrome.google.com';
+  } catch (_) { return false; }
+}
 function isBlockedAdRequest(rawUrl) {
   try {
     const u = new URL(rawUrl); const host = u.hostname.toLowerCase(); const pathName = u.pathname.toLowerCase();
@@ -44,7 +57,7 @@ function isBlockedAdRequest(rawUrl) {
 function configureShield(ses) {
   if (shieldRequestListener) ses.webRequest.onBeforeRequest(null);
   shieldRequestListener = (details, callback) => {
-    const blocked = shieldEnabled && isBlockedAdRequest(details.url);
+    const blocked = shieldEnabled && !isChromeWebStoreRequest(details) && isBlockedAdRequest(details.url);
     if (blocked) { blockedRequestCount += 1; send('shield-count', blockedRequestCount); }
     callback({ cancel: blocked });
   };
