@@ -75,7 +75,8 @@
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "maintainer": "Bolt Browser maintainers"
     },
     "nsis": {
       "oneClick": true,
