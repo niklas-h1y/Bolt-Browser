@@ -10,6 +10,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
 } else if (window.location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('bolt', {
     newTab: url => invoke('tab:new', url),
+    setOverlayOpen: isOpen => invoke('tab:overlay', isOpen),
     activateTab: id => invoke('tab:activate', id),
     closeTab: id => invoke('tab:close', id),
     navigate: url => invoke('tab:navigate', url),
