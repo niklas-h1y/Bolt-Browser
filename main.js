@@ -38,7 +38,7 @@ function activate(id) {
   publishTabs();
 }
 function isExtensionsUrl(value) {
-  return /^\s*(?:chrome|bolt):\/\/extensions\/?(?:[?#].*)?\s*$/i.test(String(value || ''));
+  return /^\\s*(?:chrome|bolt):\\/\\/extensions\\/?(?:[?#].*)?\\s*$/i.test(String(value || ''));
 }
 function openExtensionsPage(webContents) {
   if (!webContents || webContents.isDestroyed()) return;
@@ -49,7 +49,7 @@ function navigateTo(input) {
   if (!value) return '';
   if (isExtensionsUrl(value)) return 'bolt://extensions';
   if (/^(https?:|file:|about:)/i.test(value)) return value;
-  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value) || /^localhost(:\d+)?/.test(value)) return 'https://' + value;
+  if (/^[\\w-]+(\\.[\\w-]+)+(:\\d+)?(\\/.*)?$/.test(value) || /^localhost(:\\d+)?/.test(value)) return 'https://' + value;
   return 'https://www.google.com/search?q=' + encodeURIComponent(value);
 }
 function createTab(url = 'bolt://newtab') {
@@ -196,15 +196,19 @@ ipcMain.handle('extensions:remove', async (event, id) => {
   }
   return true;
 });
-browserSession().on('will-download', (_event, item) => {
-  const filename = item.getFilename();
-  send('download-started', { filename, totalBytes: item.getTotalBytes() });
-  item.on('updated', (_e, state) => send('download-progress', { filename, receivedBytes: item.getReceivedBytes(), totalBytes: item.getTotalBytes(), state }));
-  item.once('done', (_e, state) => send('download-finished', { filename, state, path: item.getSavePath() }));
-});
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('com.bolt.browser');
+
+  // Session access is only valid after Electron has emitted app 'ready'.
+  const ses = browserSession();
+  ses.on('will-download', (_event, item) => {
+    const filename = item.getFilename();
+    send('download-started', { filename, totalBytes: item.getTotalBytes() });
+    item.on('updated', (_e, state) => send('download-progress', { filename, receivedBytes: item.getReceivedBytes(), totalBytes: item.getTotalBytes(), state }));
+    item.once('done', (_e, state) => send('download-finished', { filename, state, path: item.getSavePath() }));
+  });
+
   await restoreExtensions();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
