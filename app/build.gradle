@@ -1,5 +1,28 @@
 plugins { id 'com.android.application' }
 
+// CI supplies GITHUB_RUN_NUMBER so every workflow build gets a monotonically
+// increasing versionCode. Local builds retain the checked-in fallback.
+def ciRunNumber = System.getenv('GITHUB_RUN_NUMBER')
+def resolvedVersionCode = ciRunNumber?.isInteger() && ciRunNumber.toInteger() > 0
+        ? ciRunNumber.toInteger()
+        : 3
+
+def keystoreBase64 = System.getenv('ANDROID_KEYSTORE_BASE64')
+def keystorePath = rootProject.file('app/release.keystore')
+def keystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def keyAlias = System.getenv('ANDROID_KEY_ALIAS')
+def keyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+
+// Support both the CI-decoded file and local/other CI environments that only
+// provide the base64 secret. Never require signing secrets for debug builds.
+if (!keystorePath.exists() && keystoreBase64) {
+    keystorePath.parentFile.mkdirs()
+    keystorePath.bytes = java.util.Base64.decoder.decode(keystoreBase64.trim())
+}
+
+def hasReleaseSigning = keystorePath.isFile() &&
+        keystorePassword && keyAlias && keyPassword
+
 android {
     namespace 'com.bolt.browser'
     compileSdk 35
@@ -7,8 +30,29 @@ android {
         applicationId 'com.bolt.browser'
         minSdk 23
         targetSdk 34
-        versionCode 2
-        versionName '1.1.0'
+        versionCode resolvedVersionCode
+        versionName '1.2.0'
+    }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile keystorePath
+                storePassword keystorePassword
+                keyAlias keyAlias
+                keyPassword keyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // Unsigned release bundles remain buildable before Play signing
+            // secrets are configured. Google Play App Signing can be enabled
+            // when the first signed bundle is uploaded.
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
