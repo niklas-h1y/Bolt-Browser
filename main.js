@@ -198,7 +198,7 @@ function saveSessionNow() {
   if (isRestoringSession) return;
   if (!uiSettings.restoreSession) { try { fs.rmSync(sessionPath(), { force: true }); } catch (_) {} return; }
   try {
-    const entries = [...tabs.entries()].map(([id, item]) => ({
+    const entries = [...tabs.entries()].filter(([, item]) => !item.incognito).map(([id, item]) => ({
       url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab',
       group: typeof item.group === 'string' ? item.group.slice(0, 24) : '',
       workspace: item.workspace || 'Personal'
@@ -249,7 +249,7 @@ function restoreSession() {
 function snapshot() {
   return [...tabs.entries()].filter(([, item]) => (item.workspace || 'Personal') === activeWorkspace).map(([id, item]) => ({
     id, url: displayUrl(item.view.webContents.getURL()), title: item.view.webContents.getTitle() || 'New tab',
-    loading: item.view.webContents.isLoading(), active: id === activeTabId,
+    loading: item.view.webContents.isLoading(), active: id === activeTabId, incognito: Boolean(item.incognito),
     group: typeof item.group === 'string' ? item.group : '', workspace: item.workspace || 'Personal'
   }));
 }
@@ -272,6 +272,7 @@ function activate(id) {
   if (extensionManager) extensionManager.selectTab(wc);
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   send('reader-state', Boolean(tabs.get(id).readerCssKey));
+  send('incognito-state', Boolean(tabs.get(id).incognito));
   publishTabs();
 }
 function internalPageForUrl(value) {
@@ -302,11 +303,19 @@ function navigateTo(input) {
   if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value) || /^localhost(:\d+)?/.test(value)) return 'https://' + value;
   return 'https://www.google.com/search?q=' + encodeURIComponent(value);
 }
-function createTab(url = 'bolt://newtab') {
+function createTab(url = 'bolt://newtab', options = {}) {
   const id = nextTabId++;
+  const incognito = options.incognito === true;
+  const tabSession = incognito ? session.fromPartition('bolt-incognito-' + crypto.randomUUID()) : browserSession();
+  if (incognito) {
+    const ua = cleanChromeUserAgent(tabSession.getUserAgent());
+    tabSession.setUserAgent(ua);
+    tabSession.webRequest.onBeforeSendHeaders((details, callback) => { details.requestHeaders['User-Agent'] = ua; details.requestHeaders['Accept-Language'] = 'en-US,en;q=0.9'; callback({ requestHeaders: details.requestHeaders }); });
+    tabSession.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => callback({ cancel: shieldEnabled && !isChromeWebStoreRequest(details) && isBlockedAdRequest(details.url) }));
+  }
   const view = new WebContentsView({
     webPreferences: {
-      session: browserSession(),
+      session: tabSession,
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       sandbox: true,
@@ -314,11 +323,13 @@ function createTab(url = 'bolt://newtab') {
     }
   });
   win.contentView.addChildView(view);
-  tabs.set(id, { view, group: '', workspace: activeWorkspace });
+  const item = { view, group: '', workspace: activeWorkspace, incognito, tabSession };
+  if (incognito) item.permissionManager = configurePermissions({ ses: tabSession, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
+  tabs.set(id, item);
   const wc = view.webContents;
-  if (extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
+  if (!incognito && extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
   // Keep the session and each embedded page on the same Chrome-like UA.
-  wc.setUserAgent(cleanChromeUserAgent(browserSession().getUserAgent()));
+  wc.setUserAgent(cleanChromeUserAgent(tabSession.getUserAgent()));
   wc.on('ipc-message', async (event, channel, extensionId) => {
     if (channel !== 'bolt-webstore-install' || !/^[a-p]{32}$/.test(String(extensionId || ''))) return;
     let page;
@@ -341,12 +352,13 @@ function createTab(url = 'bolt://newtab') {
     }
   });
   attachDevToolsShortcut(wc);
-  if (permissionManager) permissionManager.attachWebContents(wc);
+  const tabPermissionManager = item.permissionManager || permissionManager;
+  if (tabPermissionManager) tabPermissionManager.attachWebContents(wc);
   wc.on('context-menu', (_event, params) => {
     const items = extensionManager?.getContextMenuItems(wc, params) || [];
     if (items.length) Menu.buildFromTemplate(items).popup({ window: win, x: params.x, y: params.y });
   });
-  wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (permissionManager) permissionManager.attachWebContents(childWindow.webContents); } });
+  wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (tabPermissionManager) tabPermissionManager.attachWebContents(childWindow.webContents); } });
   wc.setWindowOpenHandler(({ url, features }) => {
     const internalPage = internalPageForUrl(url);
     if (internalPage) {
@@ -406,9 +418,10 @@ function closeTab(id, fromExtension = false) {
   const item = tabs.get(id);
   if (!item) return;
   tabs.delete(id);
-  if (extensionManager && !fromExtension) extensionManager.removeTab(item.view.webContents);
+  if (extensionManager && !fromExtension && !item.incognito) extensionManager.removeTab(item.view.webContents);
   win?.contentView.removeChildView(item.view);
   if (!item.view.webContents.isDestroyed()) item.view.webContents.close();
+  if (item.incognito && item.tabSession) item.tabSession.clearStorageData().catch(error => console.warn('Could not clear incognito data:', error));
   if (activeTabId === id) {
     const next = [...tabs.entries()].filter(([, tab]) => (tab.workspace || 'Personal') === activeWorkspace).map(([tabId]) => tabId).at(-1);
     if (next) activate(next); else createTab();
@@ -589,6 +602,7 @@ ipcMain.handle('tab:overlay', (_e, isOpen) => {
   layoutViews();
 });
 ipcMain.handle('tab:new', (_e, url) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return createTab(url || 'bolt://newtab'); });
+ipcMain.handle('tab:new-incognito', (_e, url) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return createTab(url || 'bolt://newtab', { incognito: true }); });
 ipcMain.handle('tab:activate', (_e, id) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return activate(Number(id)); });
 ipcMain.handle('workspace:list', event => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
@@ -682,7 +696,7 @@ ipcMain.handle('backup:export', async event => {
     permissions: { ...permissionSettings },
     siteOverrides: { ...siteOverrides },
     shieldEnabled,
-    tabs: [...tabs.values()].map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '', workspace: item.workspace || 'Personal' })),
+    tabs: [...tabs.values()].filter(item => !item.incognito).map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '', workspace: item.workspace || 'Personal' })),
     workspaces: [...workspaces], activeWorkspace,
     activeIndex: Math.max(0, [...tabs.keys()].indexOf(activeTabId))
   };
