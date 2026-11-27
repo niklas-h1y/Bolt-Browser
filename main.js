@@ -285,6 +285,18 @@ ipcMain.handle('extensions:install', async (event) => {
   if (!fs.existsSync(manifestPath)) throw new Error('That folder does not contain manifest.json.');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   if (manifest.manifest_version !== 3) throw new Error('Only Manifest V3 extensions are supported.');
+  const requested = [...(manifest.permissions || []), ...(manifest.host_permissions || [])];
+  const approval = await dialog.showMessageBox(win, {
+    type: 'warning',
+    title: 'Review extension permissions',
+    message: 'Install "' + (manifest.name || 'this extension') + '"?',
+    detail: requested.length ? 'This extension requests access to:\\n' + requested.join('\\n') : 'This extension did not declare permissions in its manifest.',
+    buttons: ['Cancel', 'Install extension'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true
+  });
+  if (approval.response !== 1) return { canceled: true };
   const extension = await browserExtensions().loadExtension(extensionPath, { allowFileAccess: false });
   if (!extensionPaths.includes(extensionPath)) extensionPaths.push(extensionPath);
   saveExtensionPaths();
@@ -355,6 +367,20 @@ app.whenReady().then(async () => {
     removeTab: webContents => {
       const entry = [...tabs.entries()].find(([, item]) => item.view.webContents === webContents);
       if (entry) closeTab(entry[0], true);
+    },
+    requestPermissions: async (extension, requested) => {
+      const names = [...(requested.permissions || []), ...(requested.origins || [])];
+      const result = await dialog.showMessageBox(win, {
+        type: 'warning',
+        title: 'Extension permission request',
+        message: (extension.name || 'An extension') + ' wants additional permissions.',
+        detail: names.length ? names.join('\\n') : 'No additional permissions were specified.',
+        buttons: ['Block', 'Allow'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true
+      });
+      return result.response === 1;
     }
   });
   ElectronChromeExtensions.handleCRXProtocol(ses);
