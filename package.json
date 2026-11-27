@@ -35,7 +35,8 @@
       "newtab.html",
       "extensions.html",
       "icon.svg",
-      "extensions/**/*"
+      "extensions/**/*",
+      "permissions.js"
     ],
     "directories": {
       "output": "dist"
