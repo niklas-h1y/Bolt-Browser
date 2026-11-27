@@ -60,12 +60,42 @@ const browserSession = () => session.fromPartition(partition);
 // Electron 35+ exposes extension methods on ses.extensions; older versions expose them on ses.
 const browserExtensions = () => {
   const ses = browserSession();
+  // Remove Electron/Bolt product tokens from requests made by the browser session.
+  const cleanUserAgent = cleanChromeUserAgent(ses.getUserAgent());
+  ses.setUserAgent(cleanUserAgent);
   const extApi = ses.extensions || ses;
   return extApi;
 };
 const extensionStorePath = () => path.join(app.getPath('userData'), 'extensions.json');
 let extensionPaths = [];
 
+function cleanChromeUserAgent(userAgent) {
+  return String(userAgent || '')
+    .replace(/\\s*Electron\\/[\\d.]+/gi, '')
+    .replace(/\\s*Bolt[\\w-]*\\/[\\d.]+/gi, '')
+    .replace(/\\s{2,}/g, ' ')
+    .trim();
+}
+function showWebStoreInstallToast(webContents, message) {
+  if (webContents && !webContents.isDestroyed()) {
+    const safeMessage = JSON.stringify(String(message));
+    webContents.executeJavaScript(`(() => {
+      const old = document.getElementById('bolt-install-toast');
+      if (old) old.remove();
+      const toast = document.createElement('div');
+      toast.id = 'bolt-install-toast';
+      toast.textContent = ${safeMessage};
+      Object.assign(toast.style, {
+        position: 'fixed', zIndex: '2147483647', right: '24px', bottom: '24px',
+        padding: '12px 18px', borderRadius: '10px', background: '#20251d',
+        color: '#eaffd2', border: '1px solid #b8f36b', font: '13px sans-serif',
+        boxShadow: '0 4px 24px #0008'
+      });
+      document.documentElement.appendChild(toast);
+      setTimeout(() => toast.remove(), 4500);
+    })()`).catch(() => {});
+  }
+}
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
@@ -157,6 +187,29 @@ function createTab(url = 'bolt://newtab') {
   tabs.set(id, { view });
   const wc = view.webContents;
   if (extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
+  // Keep the session and each embedded page on the same Chrome-like UA.
+  wc.setUserAgent(cleanChromeUserAgent(browserSession().getUserAgent()));
+  wc.on('ipc-message', async (event, channel, extensionId) => {
+    if (channel !== 'bolt-webstore-install' || !/^[a-p]{32}$/.test(String(extensionId || ''))) return;
+    let page;
+    try { page = new URL(wc.getURL()); } catch (_) { return; }
+    if (page.protocol !== 'https:' || page.hostname !== 'chromewebstore.google.com') return;
+    const pathId = page.pathname.split('/').filter(Boolean).find(part => /^[a-p]{32}$/.test(part));
+    if (pathId !== extensionId) return;
+    try {
+      const installed = await downloadCrxById(extensionId);
+      if (installed?.canceled) {
+        showWebStoreInstallToast(wc, 'Extension installation canceled.');
+        return;
+      }
+      const label = installed?.name || 'Extension';
+      showWebStoreInstallToast(wc, label + ' installed in Bolt Browser.');
+      if (Notification.isSupported()) new Notification({ title: 'Extension installed', body: label + ' is ready to use.' }).show();
+    } catch (error) {
+      showWebStoreInstallToast(wc, 'Could not install extension: ' + error.message);
+      console.error('Chrome Web Store installation failed:', error);
+    }
+  });
   attachDevToolsShortcut(wc);
   if (permissionManager) permissionManager.attachWebContents(wc);
   wc.on('context-menu', (_event, params) => {
@@ -511,6 +564,11 @@ app.whenReady().then(async () => {
   loadSettings();
   const ses = browserSession();
   configureShield(ses);
+  // Apply the cleaned UA to webview/webContents network requests as well.
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    details.requestHeaders['User-Agent'] = cleanUserAgent;
+    callback({ requestHeaders: details.requestHeaders });
+  });
   permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
   extensionManager = new ElectronChromeExtensions({
     session: ses,
