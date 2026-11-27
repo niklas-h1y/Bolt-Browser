@@ -4,7 +4,7 @@ Bolt uses the persistent `persist:bolt` Electron session. The handlers live in `
 
 ## What is implemented
 
-- Camera and microphone requests (`media`) are prompted separately based on the requested media types. Camera PTZ requests are mapped to the camera master switch and prompted.
+- Camera and microphone requests (`media`) are prompted separately based on the requested media types. Camera PTZ has its own switch (and also requires the camera switch) and is prompted.
 - Screen capture is split into the `display-capture` permission prompt and a desktop/window source chooser using `desktopCapturer.getSources()`. System audio loopback is offered only on Windows.
 - Geolocation and approximate geolocation requests are prompted and controlled by the Location switch.
 - Web Bluetooth uses `webContents`'s `select-bluetooth-device` event.
@@ -20,7 +20,7 @@ Bolt uses the persistent `persist:bolt` Electron session. The handlers live in `
 
 1. Open **Windows Settings → Privacy & security → Location**.
 2. Turn on **Location services** and allow desktop apps to access location when Windows presents that control.
-3. In the Bolt settings modal, enable **Location & approximate location** and reload the site/request location again.
+3. In the Bolt settings modal, enable **Precise location** or **Approximate location** as required and retry the request.
 4. If Chromium's network geolocation provider still cannot resolve a location, configure a Google Cloud API key with the Geolocation API enabled and billing enabled. Set the user environment variable `BOLT_GOOGLE_API_KEY` on the Windows account that runs Bolt (for example, in PowerShell: `[Environment]::SetEnvironmentVariable('BOLT_GOOGLE_API_KEY', 'YOUR_KEY', 'User')`), then fully restart Bolt. The main process copies it to Electron's expected `GOOGLE_API_KEY`; setting it only in a build job will not configure an already-installed app. Do not commit the key to source control or bake it into a public installer. Restrict the key and monitor usage in Google Cloud.
 
 Electron geolocation relies on Google's geolocation web service; the API key is not a replacement for the user's operating-system privacy controls.
