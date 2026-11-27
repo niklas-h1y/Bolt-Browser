@@ -563,8 +563,11 @@ app.whenReady().then(async () => {
   // Session access is only valid after Electron has emitted app 'ready'.
   loadSettings();
   const ses = browserSession();
+  // Compute and apply the cleaned UA once, then reuse it for all session requests.
+  const cleanUserAgent = cleanChromeUserAgent(ses.getUserAgent());
+  ses.setUserAgent(cleanUserAgent);
   configureShield(ses);
-  // Apply the cleaned UA to webview/webContents network requests as well.
+  // Keep the request header consistent with the session and embedded webContents.
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders['User-Agent'] = cleanUserAgent;
     callback({ requestHeaders: details.requestHeaders });
