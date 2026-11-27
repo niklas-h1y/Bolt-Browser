@@ -320,6 +320,9 @@ async function installCrxBuffer(buffer, expectedId) {
     if (!fs.existsSync(manifestPath)) throw new Error('CRX3 archive has no manifest.json.');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     if (manifest.manifest_version !== 3) throw new Error('Only Manifest V3 extensions are supported by Bolt.');
+    const requested = [...(manifest.permissions || []), ...(manifest.host_permissions || [])];
+    const approval = await dialog.showMessageBox(win, { type: 'warning', title: 'Review CRX extension permissions', message: 'Install "' + (manifest.name || parsed.id) + '"?', detail: requested.length ? 'This extension requests access to:\\n' + requested.join('\\n') : 'No permissions are declared in its manifest.', buttons: ['Cancel', 'Install extension'], defaultId: 0, cancelId: 0, noLink: true });
+    if (approval.response !== 1) return { canceled: true };
     manifest.key = parsed.publicKey;
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
     fs.rmSync(target, { recursive: true, force: true });
@@ -468,11 +471,15 @@ ipcMain.handle('extensions:remove', async (event, id) => {
   if (popup && !popup.isDestroyed()) popup.close();
   extensionPopupWindows.delete(id);
   await browserExtensions().removeExtension(id);
+  const crxDirectory = path.resolve(path.join(app.getPath('userData'), 'installed-extensions', id));
+  if (crxDirectory.startsWith(path.resolve(path.join(app.getPath('userData'), 'installed-extensions')) + path.sep)) fs.rmSync(crxDirectory, { recursive: true, force: true });
   if (extension.path) {
     const removedPath = path.resolve(extension.path);
     extensionPaths = extensionPaths.filter(extensionPath => path.resolve(extensionPath) !== removedPath);
     saveExtensionPaths();
   }
+  extensionPaths = extensionPaths.filter(extensionPath => path.resolve(extensionPath) !== crxDirectory);
+  saveExtensionPaths();
   return true;
 });
 
