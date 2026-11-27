@@ -233,6 +233,11 @@ function createTab(url = 'bolt://newtab') {
   });
   wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (permissionManager) permissionManager.attachWebContents(childWindow.webContents); } });
   wc.setWindowOpenHandler(({ url, features }) => {
+    const internalPage = internalPageForUrl(url);
+    if (internalPage) {
+      createTab(url);
+      return { action: 'deny' };
+    }
     let target;
     try { target = new URL(url); } catch { return { action: 'deny' }; }
     if (!['http:', 'https:', 'about:'].includes(target.protocol)) {
@@ -257,9 +262,10 @@ function createTab(url = 'bolt://newtab') {
     publishTabs();
   });
   wc.on('will-navigate', (event, navigatedUrl) => {
-    if (isExtensionsUrl(navigatedUrl)) {
+    const internalPage = internalPageForUrl(navigatedUrl);
+    if (internalPage) {
       event.preventDefault();
-      openExtensionsPage(wc);
+      loadInternalPage(wc, internalPage);
       return;
     }
     send('navigation-started', { id, url: navigatedUrl });
@@ -269,11 +275,12 @@ function createTab(url = 'bolt://newtab') {
   });
   wc.on('render-process-gone', (_event, details) => send('browser-error', { id, message: 'A page process stopped: ' + details.reason }));
   activate(id);
-  if (url === 'bolt://newtab') {
+  if (url === 'bolt://newtab' || internalPageForUrl(url) === 'newtab') {
     const override = extensionManager?.getURLOverrides().newtab;
-    if (override) wc.loadURL(override); else wc.loadFile(path.join(__dirname, 'newtab.html'));
+    if (override) wc.loadURL(override); else loadInternalPage(wc, 'newtab');
   }
-  else if (isExtensionsUrl(url)) openExtensionsPage(wc);
+  else if (internalPageForUrl(url) === 'extensions') openExtensionsPage(wc);
+  else if (internalPageForUrl(url) === 'unsupported') loadInternalPage(wc, 'unsupported');
   else wc.loadURL(navigateTo(url));
   return id;
 }
