@@ -6,6 +6,7 @@ let win;
 let tabs = new Map();
 let activeTabId = null;
 let overlayOpen = false;
+let extensionPopupWindows = new Map();
 let nextTabId = 1;
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
@@ -213,10 +214,33 @@ ipcMain.handle('extensions:install', async (event) => {
   saveExtensionPaths();
   return extensionSummary(extension);
 });
+ipcMain.handle('extensions:open-popup', async (event, id) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
+  const extension = browserExtensions().getAllExtensions().find(item => item.id === id && item.manifest?.manifest_version === 3);
+  if (!extension) throw new Error('Extension not found.');
+  const popupPath = extension.manifest?.action?.default_popup || extension.manifest?.browser_action?.default_popup;
+  if (!popupPath) throw new Error('This extension does not provide a toolbar popup. Electron does not implement Chrome action click events.');
+  const popupUrl = new URL(popupPath.replace(/^\\//, ''), extension.url.endsWith('/') ? extension.url : extension.url + '/').toString();
+  const existing = extensionPopupWindows.get(id);
+  if (existing && !existing.isDestroyed()) { existing.show(); existing.focus(); return true; }
+  const popup = new BrowserWindow({
+    width: 380, height: 560, minWidth: 280, minHeight: 240,
+    parent: win, show: false, autoHideMenuBar: true, backgroundColor: '#191b18',
+    webPreferences: { session: browserSession(), contextIsolation: true, sandbox: true, nodeIntegration: false }
+  });
+  extensionPopupWindows.set(id, popup);
+  popup.on('closed', () => { if (extensionPopupWindows.get(id) === popup) extensionPopupWindows.delete(id); });
+  try { await popup.loadURL(popupUrl); if (!popup.isDestroyed()) popup.show(); }
+  catch (error) { extensionPopupWindows.delete(id); if (!popup.isDestroyed()) popup.destroy(); throw new Error('Could not open extension popup: ' + error.message); }
+  return true;
+});
 ipcMain.handle('extensions:remove', async (event, id) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
   const extension = browserExtensions().getAllExtensions().find(item => item.id === id && item.manifest?.manifest_version === 3);
   if (!extension) throw new Error('Extension not found.');
+  const popup = extensionPopupWindows.get(id);
+  if (popup && !popup.isDestroyed()) popup.close();
+  extensionPopupWindows.delete(id);
   await browserExtensions().removeExtension(id);
   if (extension.path) {
     const removedPath = path.resolve(extension.path);
