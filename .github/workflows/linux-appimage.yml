@@ -1,0 +1,49 @@
+name: Linux AppImage
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-appimage:
+    name: Build Linux AppImage (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build extension action preload
+        run: npm run build:preload
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check main.js
+          node --check preload.js
+          node --check preload.bundle.js
+          node --check permissions.js
+
+      - name: Build AppImage
+        run: npx electron-builder --linux AppImage --x64 --publish never
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bolt-Browser-Linux-AppImage-x86_64
+          path: dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
