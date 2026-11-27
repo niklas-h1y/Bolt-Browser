@@ -67,6 +67,8 @@ function configurePermissions({ ses, getWindow, getSettings, getSiteOverrides = 
     const toggle = permissionToggle[permission];
     if (!toggle || !enabled(toggle)) return false;
     if (permission === 'camera-pan-tilt-zoom' && !enabled('camera')) return false;
+    const decision = siteDecision(origin, permission);
+    if (decision !== null) return decision;
     if (['usb', 'serial', 'hid', 'bluetooth'].includes(permission)) return true;
     return hasGrant(origin, permission);
   });
