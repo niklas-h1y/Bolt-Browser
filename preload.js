@@ -5,6 +5,27 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
 }
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
+
+// The Web Store's private Chrome API is not implemented by Electron. Forward an
+// explicit user click to the main process, where the signed CRX is verified and
+// the user is shown the normal extension-permissions approval dialog.
+if (window.location.protocol === 'https:' && window.location.hostname === 'chromewebstore.google.com') {
+  document.addEventListener('click', event => {
+    const button = event.target?.closest?.('button,[role="button"]');
+    if (!button) return;
+    const label = [button.innerText, button.getAttribute('aria-label'), button.getAttribute('title')]
+      .filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim();
+    if (!/(add\\s+to\\s+chrome|hinzufügen)/i.test(label)) return;
+    const parts = window.location.pathname.split('/').filter(Boolean);
+    const extensionId = parts.find(part => /^[a-p]{32}$/.test(part));
+    if (!extensionId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    ipcRenderer.sendToHost('bolt-webstore-install', extensionId);
+  }, true);
+}
+
 if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/extensions.html')) {
   contextBridge.exposeInMainWorld('boltExtensions', {
     list: () => invoke('extensions:list'),
