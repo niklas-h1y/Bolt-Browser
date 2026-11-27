@@ -76,6 +76,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     newTab: url => invoke('tab:new', url),
     setOverlayOpen: isOpen => invoke('tab:overlay', isOpen),
     activateTab: id => invoke('tab:activate', id),
+    setTabGroup: (id, group) => invoke('tab:set-group', id, group),
     closeTab: id => invoke('tab:close', id),
     navigate: url => invoke('tab:navigate', url),
     back: () => invoke('tab:back'),
