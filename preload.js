@@ -10,14 +10,31 @@ const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 // explicit user click to the main process, where the signed CRX is verified and
 // the user is shown the normal extension-permissions approval dialog.
 if (window.location.protocol === 'https:' && window.location.hostname === 'chromewebstore.google.com') {
+  const isAddToChromeButton = element => {
+    if (!element?.matches?.('button,[role="button"]')) return false;
+    const label = [element.innerText, element.getAttribute('aria-label'), element.getAttribute('title')]
+      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    return /(add\s+to\s+chrome|hinzufügen)/i.test(label);
+  };
+  const enableStoreInstallButton = () => {
+    document.querySelectorAll('button,[role="button"]').forEach(button => {
+      if (!isAddToChromeButton(button)) return;
+      if (button.disabled) button.disabled = false;
+      if (button.hasAttribute('disabled')) button.removeAttribute('disabled');
+      if (button.getAttribute('aria-disabled') === 'true') button.setAttribute('aria-disabled', 'false');
+      if (button.style.pointerEvents === 'none') button.style.pointerEvents = 'auto';
+    });
+  };
+  enableStoreInstallButton();
+  new MutationObserver(enableStoreInstallButton).observe(document.documentElement, {
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ['disabled', 'aria-disabled']
+  });
   document.addEventListener('click', event => {
     const button = event.target?.closest?.('button,[role="button"]');
-    if (!button) return;
-    const label = [button.innerText, button.getAttribute('aria-label'), button.getAttribute('title')]
-      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    if (!/(add\s+to\s+chrome|hinzufügen)/i.test(label)) return;
-    const parts = window.location.pathname.split('/').filter(Boolean);
-    const extensionId = parts.find(part => /^[a-p]{32}$/.test(part));
+    if (!isAddToChromeButton(button)) return;
+    const extensionId = window.location.pathname.split('/').filter(Boolean)
+      .find(part => /^[a-p]{32}$/.test(part));
     if (!extensionId) return;
     event.preventDefault();
     event.stopPropagation();
