@@ -45,6 +45,16 @@ function handleExternalProtocol(rawUrl) {
 }
 app.on('open-url', (event, url) => { event.preventDefault(); handleExternalProtocol(url); });
 
+function attachDevToolsShortcut(webContents) {
+  if (!webContents || webContents.isDestroyed()) return;
+  webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      event.preventDefault();
+      if (!webContents.isDestroyed()) webContents.toggleDevTools();
+    }
+  });
+}
+
 function displayUrl(rawUrl) {
   const value = String(rawUrl || '');
   if (!value || value === 'about:blank') return '';
@@ -111,6 +121,7 @@ function createTab(url = 'bolt://newtab') {
   win.contentView.addChildView(view);
   tabs.set(id, { view });
   const wc = view.webContents;
+  attachDevToolsShortcut(wc);
   if (permissionManager) permissionManager.attachWebContents(wc);
   wc.on('did-create-window', childWindow => { if (permissionManager && childWindow?.webContents) permissionManager.attachWebContents(childWindow.webContents); });
   wc.setWindowOpenHandler(({ url, features }) => {
@@ -174,6 +185,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   win.loadFile(path.join(__dirname, 'index.html')).catch(error => console.error('Could not load browser UI:', error));
+  attachDevToolsShortcut(win.webContents);
   win.on('resize', layoutViews);
   win.on('enter-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
   win.on('leave-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
