@@ -14,8 +14,8 @@ if (window.location.protocol === 'https:' && window.location.hostname === 'chrom
     const button = event.target?.closest?.('button,[role="button"]');
     if (!button) return;
     const label = [button.innerText, button.getAttribute('aria-label'), button.getAttribute('title')]
-      .filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim();
-    if (!/(add\\s+to\\s+chrome|hinzufügen)/i.test(label)) return;
+      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (!/(add\s+to\s+chrome|hinzufügen)/i.test(label)) return;
     const parts = window.location.pathname.split('/').filter(Boolean);
     const extensionId = parts.find(part => /^[a-p]{32}$/.test(part));
     if (!extensionId) return;
