@@ -612,6 +612,7 @@ ipcMain.handle('workspace:switch', (event, name) => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
   if (typeof name !== 'string' || !workspaces.includes(name)) throw new Error('Workspace not found.');
   activeWorkspace = name;
+  saveSettings();
   const existing = [...tabs.entries()].find(([, item]) => (item.workspace || 'Personal') === name)?.[0];
   if (existing) activate(existing); else createTab();
   send('workspaces-updated', { workspaces: [...workspaces], active: activeWorkspace });
@@ -730,6 +731,7 @@ ipcMain.handle('backup:import', async event => {
   configureShield(browserSession());
   workspaces = Array.isArray(backup.workspaces) ? [...new Set(backup.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal'];
   if (!workspaces.length) workspaces = ['Personal'];
+  if (!workspaces.includes('Personal') && workspaces.length < 12) workspaces.unshift('Personal');
   activeWorkspace = workspaces.includes(backup.activeWorkspace) ? backup.activeWorkspace : workspaces[0];
   const incomingTabs = Array.isArray(backup.tabs) ? backup.tabs.slice(0, 50).map(entry => {
     let url = typeof entry?.url === 'string' ? entry.url : 'bolt://newtab';
