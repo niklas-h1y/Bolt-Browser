@@ -6,7 +6,7 @@ This folder is the repository's extension library. Add each extension in its own
 
 ### Desktop (Electron / Chromium)
 
-The desktop edition loads **unpacked Chromium extensions using Manifest V3** and uses [`electron-chrome-extensions`](https://github.com/samuelmaddock/electron-browser-shell/tree/master/packages/electron-chrome-extensions) to provide browser-style extension integration:
+The desktop edition loads **unpacked Chromium Manifest V3 extensions** and uses [`electron-chrome-extensions`](https://github.com/samuelmaddock/electron-browser-shell/tree/master/packages/electron-chrome-extensions) to provide browser-style extension integration. It can also install signed CRX3 packages from local files or official Chrome Web Store URLs / extension IDs:
 
 - A `manifest.json` file at the extension folder root.
 - `manifest_version: 3`.
