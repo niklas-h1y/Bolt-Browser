@@ -1,6 +1,10 @@
-const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, shell } = require('electron');
+const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, shell, protocol, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { pathToFileURL } = require('node:url');
+const { configurePermissions, DEFAULTS: DEFAULT_PERMISSION_SETTINGS } = require('./permissions');
+
+protocol.registerSchemesAsPrivileged([{ scheme: 'bolt', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 let win;
 let tabs = new Map();
@@ -8,6 +12,12 @@ let activeTabId = null;
 let overlayOpen = false;
 let extensionPopupWindows = new Map();
 let nextTabId = 1;
+let chromeHidden = false;
+let permissionManager;
+let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
+const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; } catch (_) {} }
+function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings }, null, 2), 'utf8'); }
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
 // Electron 35+ exposes extension methods on ses.extensions; older versions expose them on ses.
@@ -46,7 +56,8 @@ function layoutViews() {
   if (!win) return;
   const { width, height } = win.getContentBounds();
   for (const [id, item] of tabs) {
-    item.view.setBounds({ x: 0, y: 116, width, height: Math.max(100, height - 140) });
+    const top = chromeHidden ? 0 : 116;
+    item.view.setBounds({ x: 0, y: top, width, height: Math.max(100, height - top - (chromeHidden ? 0 : 24)) });
     item.view.setVisible(id === activeTabId && !overlayOpen);
   }
 }
@@ -87,10 +98,21 @@ function createTab(url = 'bolt://newtab') {
   win.contentView.addChildView(view);
   tabs.set(id, { view });
   const wc = view.webContents;
-  wc.setWindowOpenHandler(({ url }) => {
-    createTab(url);
-    return { action: 'deny' };
+  if (permissionManager) permissionManager.attachWebContents(wc);
+  wc.setWindowOpenHandler(({ url, features }) => {
+    let target;
+    try { target = new URL(url); } catch { return { action: 'deny' }; }
+    if (!['http:', 'https:', 'about:'].includes(target.protocol)) {
+      if (target.protocol !== 'about:') shell.openExternal(url).catch(() => {});
+      return { action: 'deny' };
+    }
+    const popupFeatures = Object.fromEntries(String(features || '').split(',').map(part => part.trim().split('=').map(v => v.trim())).filter(pair => pair.length === 2));
+    const width = Math.max(360, Math.min(1200, Number(popupFeatures.width) || 900));
+    const height = Math.max(300, Math.min(1000, Number(popupFeatures.height) || 700));
+    return { action: 'allow', overrideBrowserWindowOptions: { width, height, autoHideMenuBar: true, parent: win, backgroundColor: '#10131b', webPreferences: { session: browserSession(), contextIsolation: true, sandbox: true, nodeIntegration: false } } };
   });
+  wc.on('enter-html-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
+  wc.on('leave-html-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
   wc.on('page-title-updated', publishTabs);
   wc.on('did-start-loading', publishTabs);
   wc.on('did-stop-loading', () => {
@@ -139,6 +161,8 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, 'index.html')).catch(error => console.error('Could not load browser UI:', error));
   win.on('resize', layoutViews);
+  win.on('enter-full-screen', () => { send('fullscreen-changed', true); });
+  win.on('leave-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
   win.on('closed', () => { win = null; tabs.clear(); });
   win.webContents.on('did-finish-load', () => createTab());
 }
@@ -196,6 +220,17 @@ ipcMain.handle('tab:forward', () => { const wc = tabs.get(activeTabId)?.view.web
 ipcMain.handle('tab:reload', () => tabs.get(activeTabId)?.view.webContents.reload());
 ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
+ipcMain.handle('settings:get-permissions', (event) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
+  return { ...permissionSettings };
+});
+ipcMain.handle('settings:set-permissions', (event, next) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
+  if (!next || typeof next !== 'object') throw new Error('Invalid permission settings.');
+  permissionSettings = permissionManager ? permissionManager.updateSettings({ ...permissionSettings, ...next }) : { ...DEFAULT_PERMISSION_SETTINGS, ...next };
+  saveSettings();
+  return { ...permissionSettings };
+});
 ipcMain.handle('extensions:list', (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Extension manager access denied.');
   return browserExtensions().getAllExtensions().filter(extension => extension.manifest?.manifest_version === 3).map(extensionSummary);
@@ -255,12 +290,21 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
 
   // Session access is only valid after Electron has emitted app 'ready'.
+  loadSettings();
   const ses = browserSession();
+  permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
+  protocol.handle('bolt', request => {
+    const host = new URL(request.url).hostname;
+    const file = host === 'newtab' ? 'newtab.html' : host === 'extensions' ? 'extensions.html' : null;
+    if (!file) return new Response('Unknown Bolt internal page', { status: 404 });
+    return net.fetch(pathToFileURL(path.join(__dirname, file)).toString());
+  });
   ses.on('will-download', (_event, item) => {
     const filename = item.getFilename();
-    send('download-started', { filename, totalBytes: item.getTotalBytes() });
-    item.on('updated', (_e, state) => send('download-progress', { filename, receivedBytes: item.getReceivedBytes(), totalBytes: item.getTotalBytes(), state }));
-    item.once('done', (_e, state) => send('download-finished', { filename, state, path: item.getSavePath() }));
+    const downloadId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    send('download-started', { id: downloadId, filename, totalBytes: item.getTotalBytes() });
+    item.on('updated', (_e, state) => send('download-progress', { id: downloadId, filename, receivedBytes: item.getReceivedBytes(), totalBytes: item.getTotalBytes(), state }));
+    item.once('done', (_e, state) => send('download-finished', { id: downloadId, filename, state, path: item.getSavePath() }));
   });
 
   await restoreExtensions();
