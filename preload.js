@@ -10,29 +10,37 @@ const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 // explicit user click to the main process, where the signed CRX is verified and
 // the user is shown the normal extension-permissions approval dialog.
 if (window.location.protocol === 'https:' && window.location.hostname === 'chromewebstore.google.com') {
-  const isAddToChromeButton = element => {
-    if (!element?.matches?.('button,[role="button"]')) return false;
-    const label = [element.innerText, element.getAttribute('aria-label'), element.getAttribute('title')]
-      .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    return /(add\s+to\s+chrome|hinzufügen)/i.test(label);
+  const INSTALL_LABEL = /(?:add\s+to\s+chrome|hinzufügen|zu\s+chrome\s+hinzufügen|zu\s+chrome\s+hinzuf[uü]gen|install(?:ieren)?)/i;
+  const isInstallButton = element => {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+    const role = element.getAttribute('role');
+    if (!element.matches('button,[role="button"],[data-testid*="install" i]')) return false;
+    const label = [
+      element.innerText,
+      element.textContent,
+      element.getAttribute('aria-label'),
+      element.getAttribute('title'),
+      element.getAttribute('data-testid')
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    return INSTALL_LABEL.test(label);
   };
-  const enableStoreInstallButton = () => {
-    document.querySelectorAll('button,[role="button"]').forEach(button => {
-      if (!isAddToChromeButton(button)) return;
-      if (button.disabled) button.disabled = false;
-      if (button.hasAttribute('disabled')) button.removeAttribute('disabled');
-      if (button.getAttribute('aria-disabled') === 'true') button.setAttribute('aria-disabled', 'false');
+  const getInstallButton = target => {
+    const path = typeof target?.composedPath === 'function' ? target.composedPath() : [];
+    for (const node of path) if (isInstallButton(node)) return node;
+    return target?.closest?.('button,[role="button"],[data-testid*="install" i]') || null;
+  };
+  const enableStoreInstallButtons = () => {
+    document.querySelectorAll('button,[role="button"],[data-testid*="install" i]').forEach(button => {
+      if (!isInstallButton(button)) return;
+      button.disabled = false;
+      button.removeAttribute('disabled');
+      button.setAttribute('aria-disabled', 'false');
       if (button.style.pointerEvents === 'none') button.style.pointerEvents = 'auto';
     });
   };
-  enableStoreInstallButton();
-  new MutationObserver(enableStoreInstallButton).observe(document, {
-    childList: true, subtree: true, attributes: true,
-    attributeFilter: ['disabled', 'aria-disabled']
-  });
-  document.addEventListener('click', event => {
-    const button = event.target?.closest?.('button,[role="button"]');
-    if (!isAddToChromeButton(button)) return;
+  const sendInstallRequest = event => {
+    const button = getInstallButton(event.target);
+    if (!isInstallButton(button)) return;
     const extensionId = window.location.pathname.split('/').filter(Boolean)
       .find(part => /^[a-p]{32}$/.test(part));
     if (!extensionId) return;
@@ -40,7 +48,15 @@ if (window.location.protocol === 'https:' && window.location.hostname === 'chrom
     event.stopPropagation();
     event.stopImmediatePropagation();
     ipcRenderer.sendToHost('bolt-webstore-install', extensionId);
-  }, true);
+  };
+  enableStoreInstallButtons();
+  new MutationObserver(enableStoreInstallButtons).observe(document, {
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ['disabled', 'aria-disabled', 'data-testid']
+  });
+  // Capture before the Store's own handlers. Both pointer and keyboard-generated
+  // click events arrive here, including controls rendered inside open shadow DOM.
+  document.addEventListener('click', sendInstallRequest, true);
 }
 
 if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/extensions.html')) {
