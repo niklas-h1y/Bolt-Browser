@@ -3,7 +3,7 @@ const { dialog, desktopCapturer } = require('electron');
 const DEFAULTS = {
   camera: true, microphone: true, screenShare: true, geolocation: true,
   bluetooth: true, usb: true, serial: true, hid: true,
-  clipboardRead: false, clipboardWrite: true, webxr: true
+  clipboardRead: false, clipboardWrite: true, webxr: true, nfc: true, sensors: true
 };
 
 const permissionToggle = {
@@ -11,7 +11,7 @@ const permissionToggle = {
   'display-capture': 'screenShare', bluetooth: 'bluetooth', usb: 'usb',
   serial: 'serial', hid: 'hid', 'clipboard-read': 'clipboardRead',
   'clipboard-sanitized-write': 'clipboardWrite', vr: 'webxr', ar: 'webxr',
-  'hand-tracking': 'webxr', 'camera-pan-tilt-zoom': 'camera'
+  'hand-tracking': 'webxr', 'camera-pan-tilt-zoom': 'camera', nfc: 'nfc', accelerometer: 'sensors', gyroscope: 'sensors', magnetometer: 'sensors'
 };
 
 function safeOrigin(value) {
@@ -82,14 +82,14 @@ function configurePermissions({ ses, getWindow, getSettings }) {
         if ((wantsVideo && !enabled('camera')) || (wantsAudio && !enabled('microphone')) || (!wantsVideo && !wantsAudio)) return done(false);
         const kinds = [wantsVideo && 'camera', wantsAudio && 'microphone'].filter(Boolean).join(' and ');
         const response = await ask('Allow camera and microphone?', origin + ' wants to use your ' + kinds + '.');
-        if (response === 0) { grant(origin, 'media:' + (wantsVideo && wantsAudio ? 'both' : wantsVideo ? 'video' : 'audio')); done(true); }
+        if (response === 0) { if (wantsVideo) grant(origin, 'media:video'); if (wantsAudio) grant(origin, 'media:audio'); done(true); }
         else done(false);
         return;
       }
       const toggle = permissionToggle[permission];
       if (!toggle || !enabled(toggle)) return done(false);
       const names = {
-        geolocation: 'location', 'geolocation-approximate': 'approximate location',
+        geolocation: 'location', 'geolocation-approximate': 'approximate location', nfc: 'NFC', accelerometer: 'motion sensors', gyroscope: 'motion sensors', magnetometer: 'motion sensors',
         'display-capture': 'screen sharing', 'clipboard-read': 'read clipboard',
         'clipboard-sanitized-write': 'write to clipboard', vr: 'VR access', ar: 'AR access',
         'hand-tracking': 'hand tracking', 'camera-pan-tilt-zoom': 'camera pan, tilt and zoom'
