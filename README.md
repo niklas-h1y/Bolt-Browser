@@ -26,7 +26,9 @@ Important compatibility notes:
 
 ## Desktop
 
-Install Node.js 20+, then run `npm install` and `npm start`. See `extensions/README.md` for desktop extension instructions.
+**Windows (easy install):** Download `Bolt-Browser-Setup-*.exe` from the latest successful [Windows installer workflow](https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/windows.yml), open it, and Bolt Browser will install with desktop and Start Menu shortcuts. No separate Node.js installation is needed. New pushes to `main` and published releases build a fresh setup file automatically. The installer keeps browser data when the app is uninstalled.
+
+For development, install Node.js 20+, then run `npm install` and `npm start`. See `extensions/README.md` for desktop extension instructions.
 
 ## Hosted start page
 
