@@ -28,8 +28,11 @@ let shieldEnabled = true;
 let blockedRequestCount = 0;
 let shieldRequestListener = null;
 let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab' };
+let sessionSaveTimer = null;
+let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+const sessionPath = () => path.join(app.getPath('userData'), 'session.json');
 function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; } catch (_) {} }
 function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, shieldEnabled, uiSettings }, null, 2), 'utf8'); }
 function isChromeWebStoreRequest(details) {
@@ -165,13 +168,78 @@ function displayUrl(rawUrl) {
   } catch (_) {}
   return value;
 }
+function sessionSafeUrl(webContents) {
+  try {
+    const raw = webContents.getURL();
+    const parsed = new URL(raw);
+    if (parsed.protocol === 'file:') {
+      const file = path.basename(decodeURIComponent(parsed.pathname)).toLowerCase();
+      if (file === 'newtab.html') return 'bolt://newtab';
+      if (file === 'extensions.html') return 'bolt://extensions';
+      return null;
+    }
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      parsed.username = '';
+      parsed.password = '';
+      return parsed.toString();
+    }
+    if (parsed.protocol === 'bolt:' && ['newtab', 'extensions'].includes(parsed.hostname)) return parsed.toString();
+  } catch (_) {}
+  return null;
+}
+function saveSessionNow() {
+  if (isRestoringSession) return;
+  try {
+    const entries = [...tabs.entries()].map(([id, item]) => ({
+      url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab',
+      group: typeof item.group === 'string' ? item.group.slice(0, 24) : ''
+    }));
+    const activeIndex = Math.max(0, [...tabs.keys()].indexOf(activeTabId));
+    fs.mkdirSync(path.dirname(sessionPath()), { recursive: true });
+    fs.writeFileSync(sessionPath(), JSON.stringify({ version: 1, tabs: entries, activeIndex }, null, 2), { encoding: 'utf8', mode: 0o600 });
+  } catch (error) { console.error('Could not save browser session:', error); }
+}
+function scheduleSessionSave() {
+  if (isRestoringSession) return;
+  clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = setTimeout(saveSessionNow, 350);
+}
+function restoreSession() {
+  let saved;
+  try { saved = JSON.parse(fs.readFileSync(sessionPath(), 'utf8')); } catch (_) { saved = null; }
+  const entries = Array.isArray(saved?.tabs) ? saved.tabs.slice(0, 50) : [];
+  if (!entries.length) { createTab(); return; }
+  isRestoringSession = true;
+  try {
+    const restoredIds = [];
+    for (const entry of entries) {
+      let url = typeof entry?.url === 'string' ? entry.url : 'bolt://newtab';
+      let valid = false;
+      try {
+        const parsed = new URL(url);
+        valid = ['http:', 'https:'].includes(parsed.protocol)
+          || (parsed.protocol === 'bolt:' && ['newtab', 'extensions'].includes(parsed.hostname));
+      } catch (_) {}
+      if (!valid) url = 'bolt://newtab';
+      const id = createTab(url);
+      const item = tabs.get(id);
+      if (item && typeof entry.group === 'string') item.group = entry.group.slice(0, 24);
+      restoredIds.push(id);
+    }
+    const index = Number.isInteger(saved.activeIndex) ? Math.min(Math.max(saved.activeIndex, 0), restoredIds.length - 1) : 0;
+    activate(restoredIds[index]);
+  } finally { isRestoringSession = false; }
+  publishTabs();
+  scheduleSessionSave();
+}
 function snapshot() {
   return [...tabs.entries()].map(([id, item]) => ({
     id, url: displayUrl(item.view.webContents.getURL()), title: item.view.webContents.getTitle() || 'New tab',
-    loading: item.view.webContents.isLoading(), active: id === activeTabId
+    loading: item.view.webContents.isLoading(), active: id === activeTabId,
+    group: typeof item.group === 'string' ? item.group : ''
   }));
 }
-function publishTabs() { send('tabs-updated', snapshot()); }
+function publishTabs() { send('tabs-updated', snapshot()); scheduleSessionSave(); }
 function layoutViews() {
   if (!win) return;
   const { width, height } = win.getContentBounds();
@@ -230,7 +298,7 @@ function createTab(url = 'bolt://newtab') {
     }
   });
   win.contentView.addChildView(view);
-  tabs.set(id, { view });
+  tabs.set(id, { view, group: '' });
   const wc = view.webContents;
   if (extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
   // Keep the session and each embedded page on the same Chrome-like UA.
@@ -327,6 +395,7 @@ function closeTab(id, fromExtension = false) {
     const next = [...tabs.keys()].at(-1);
     if (next) activate(next); else createTab();
   } else publishTabs();
+  scheduleSessionSave();
 }
 function createWindow() {
   win = new BrowserWindow({
@@ -340,9 +409,9 @@ function createWindow() {
   win.on('resize', layoutViews);
   win.on('enter-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
   win.on('leave-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
-  win.on('closed', () => { win = null; tabs.clear(); });
+  win.on('closed', () => { saveSessionNow(); win = null; tabs.clear(); });
   win.webContents.on('did-finish-load', () => {
-    createTab();
+    restoreSession();
     if (pendingProtocolUrl) { const url = pendingProtocolUrl; pendingProtocolUrl = null; handleExternalProtocol(url); }
   });
 }
@@ -494,6 +563,15 @@ ipcMain.handle('tab:overlay', (_e, isOpen) => {
 });
 ipcMain.handle('tab:new', (_e, url) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return createTab(url || 'bolt://newtab'); });
 ipcMain.handle('tab:activate', (_e, id) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return activate(Number(id)); });
+ipcMain.handle('tab:set-group', (_e, id, group) => {
+  if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.');
+  const item = tabs.get(Number(id));
+  if (!item) throw new Error('Tab not found.');
+  if (typeof group !== 'string' || group.length > 24 || /[\\r\\n\\0]/.test(group)) throw new Error('Invalid tab group name.');
+  item.group = group.trim();
+  publishTabs();
+  return item.group;
+});
 ipcMain.handle('tab:close', (_e, id) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return closeTab(Number(id)); });
 ipcMain.handle('tab:navigate', (_e, input) => {
   if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.');
@@ -637,6 +715,7 @@ ipcMain.handle('extensions:remove', async (event, id) => {
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('com.bolt.browser');
+  app.on('before-quit', () => { clearTimeout(sessionSaveTimer); saveSessionNow(); });
   if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient('bolt', process.execPath, [path.resolve(process.argv[1])]);
   else app.setAsDefaultProtocolClient('bolt');
   Menu.setApplicationMenu(null);
