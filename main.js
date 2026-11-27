@@ -448,7 +448,7 @@ function closeTab(id, fromExtension = false) {
   if (extensionManager && !fromExtension && !item.incognito && (item.workspace || 'Personal') === 'Personal') extensionManager.removeTab(item.view.webContents);
   win?.contentView.removeChildView(item.view);
   if (!item.view.webContents.isDestroyed()) item.view.webContents.close();
-  if (item.incognito && item.tabSession) item.tabSession.clearStorageData().catch(error => console.warn('Could not clear incognito data:', error));
+  if (item.incognito && item.tabSession) Promise.all([item.tabSession.clearStorageData(), item.tabSession.clearCache()]).catch(error => console.warn('Could not clear incognito data:', error));
   if (activeTabId === id) {
     const next = [...tabs.entries()].filter(([, tab]) => (tab.workspace || 'Personal') === activeWorkspace).map(([tabId]) => tabId).at(-1);
     if (next) activate(next); else createTab();
