@@ -77,6 +77,9 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     setOverlayOpen: isOpen => invoke('tab:overlay', isOpen),
     activateTab: id => invoke('tab:activate', id),
     setTabGroup: (id, group) => invoke('tab:set-group', id, group),
+    getWorkspaces: () => invoke('workspace:list'),
+    createWorkspace: name => invoke('workspace:create', name),
+    switchWorkspace: name => invoke('workspace:switch', name),
     closeTab: id => invoke('tab:close', id),
     navigate: url => invoke('tab:navigate', url),
     back: () => invoke('tab:back'),
@@ -104,7 +107,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
-      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated'];
+      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated', 'workspaces-updated'];
       if (allowed.includes(channel)) ipcRenderer.on(channel, (_event, data) => callback(data));
     }
   });
