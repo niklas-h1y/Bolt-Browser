@@ -50,10 +50,10 @@ ECS currently documents limitations around persistent licenses; check the select
 - Device APIs generally require HTTPS, a supported device, a browser permission request, and a user gesture. A web page cannot use them merely because the desktop app has a switch enabled.
 - WebUSB, WebHID, and Web Serial retain Chromium's protected-device blocklists. Do not globally disable these blocklists as a routine fix; doing so can expose keyboards, storage, smart cards, and other sensitive devices.
 - Web NFC is not generally available in desktop Chromium/Electron builds and is commonly limited to supported Android devices. A permission handler cannot add an NFC controller or implement an API Chromium does not ship.
-- WebXR requires a supported XR runtime/device, graphics stack, secure origin, and Chromium feature support. VR/AR permission handling alone does not install an OpenXR runtime or enable unsupported hardware.
+- WebXR requires a supported XR runtime/device, graphics stack, secure origin, and Chromium feature support. VR/AR permission handling alone does not install an OpenXR runtime or enable unsupported hardware. There is no single stable Electron switch that enables every WebXR feature; check the Chromium version bundled with the chosen Electron release and inspect that version's `about://flags` / feature metadata before adding a targeted `app.commandLine.appendSwitch('enable-features', ...)` or `experimentalFeatures` setting. Avoid globally enabling experimental web-platform features in production.
 - Device Orientation/Motion APIs may be unavailable on desktops without sensors. They are more commonly useful on supported mobile hardware.
 - Bluetooth, USB, serial, and HID access may additionally be restricted by Windows drivers, OS permissions, device availability, Linux udev rules, or macOS privacy/security settings.
-- Pointer lock and keyboard lock are still governed by the web platform's user-activation and document-focus rules. Bolt does not synthesize gestures or bypass those checks.
+- Pointer lock, keyboard lock, and fullscreen are permission-gated by Bolt's settings and still governed by web-platform user-activation, focus, and fullscreen rules. Bolt does not synthesize gestures or bypass those checks.
 
 ## Security model and testing
 
