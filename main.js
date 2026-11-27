@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { configurePermissions, DEFAULTS: DEFAULT_PERMISSION_SETTINGS } = require('./permissions');
+const { ElectronChromeExtensions } = require('electron-chrome-extensions');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'bolt', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 // Set BOLT_GOOGLE_API_KEY in the build environment; never commit a private API key.
@@ -16,6 +17,7 @@ let extensionPopupWindows = new Map();
 let nextTabId = 1;
 let chromeHidden = false;
 let permissionManager;
+let extensionManager;
 let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
@@ -89,6 +91,7 @@ function activate(id) {
   activeTabId = id;
   layoutViews();
   const wc = tabs.get(id).view.webContents;
+  if (extensionManager) extensionManager.selectTab(wc);
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   publishTabs();
 }
@@ -121,6 +124,7 @@ function createTab(url = 'bolt://newtab') {
   win.contentView.addChildView(view);
   tabs.set(id, { view });
   const wc = view.webContents;
+  if (extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
   attachDevToolsShortcut(wc);
   if (permissionManager) permissionManager.attachWebContents(wc);
   wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (permissionManager) permissionManager.attachWebContents(childWindow.webContents); } });
@@ -161,7 +165,10 @@ function createTab(url = 'bolt://newtab') {
   });
   wc.on('render-process-gone', (_event, details) => send('browser-error', { id, message: 'A page process stopped: ' + details.reason }));
   activate(id);
-  if (url === 'bolt://newtab') wc.loadFile(path.join(__dirname, 'newtab.html'));
+  if (url === 'bolt://newtab') {
+    const override = extensionManager?.getURLOverrides().newtab;
+    if (override) wc.loadURL(override); else wc.loadFile(path.join(__dirname, 'newtab.html'));
+  }
   else if (isExtensionsUrl(url)) openExtensionsPage(wc);
   else wc.loadURL(navigateTo(url));
   return id;
@@ -170,6 +177,7 @@ function closeTab(id) {
   const item = tabs.get(id);
   if (!item) return;
   tabs.delete(id);
+  if (extensionManager) extensionManager.removeTab(item.view.webContents);
   win?.contentView.removeChildView(item.view);
   item.view.webContents.close();
   if (activeTabId === id) {
@@ -182,7 +190,7 @@ function createWindow() {
     width: 1440, height: 940, minWidth: 760, minHeight: 560,
     backgroundColor: '#10131b',
     title: 'Bolt Browser',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
+    webPreferences: { preload: path.join(__dirname, 'preload.bundle.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   win.loadFile(path.join(__dirname, 'index.html')).catch(error => console.error('Could not load browser UI:', error));
   attachDevToolsShortcut(win.webContents);
@@ -324,6 +332,29 @@ app.whenReady().then(async () => {
   loadSettings();
   const ses = browserSession();
   permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
+  extensionManager = new ElectronChromeExtensions({
+    session: ses,
+    createTab: async details => {
+      if (!win || win.isDestroyed()) throw new Error('Bolt Browser window is not available.');
+      if (typeof details.windowId === 'number' && details.windowId !== win.id) throw new Error('The requested browser window is not available.');
+      const previousTabId = activeTabId;
+      const id = createTab(details.url || 'bolt://newtab');
+      const item = tabs.get(id);
+      if (details.active === false && previousTabId && tabs.has(previousTabId)) activate(previousTabId);
+      return [item.view.webContents, win];
+    },
+    selectTab: (webContents, browserWindow) => {
+      if (!win || browserWindow !== win) return;
+      const entry = [...tabs.entries()].find(([, item]) => item.view.webContents === webContents);
+      if (entry) activate(entry[0]);
+    },
+    removeTab: webContents => {
+      const entry = [...tabs.entries()].find(([, item]) => item.view.webContents === webContents);
+      if (entry) closeTab(entry[0]);
+    }
+  });
+  ElectronChromeExtensions.handleCRXProtocol(ses);
+
   if (process.platform === 'darwin' && typeof app.configureWebAuthn === 'function' && process.env.BOLT_WEBAUTHN_KEYCHAIN_GROUP) {
     app.configureWebAuthn({
       touchID: { keychainAccessGroup: process.env.BOLT_WEBAUTHN_KEYCHAIN_GROUP, promptReason: 'verify your identity for $1' },
