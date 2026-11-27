@@ -79,6 +79,30 @@ function setShieldEnabled(enabled) {
 }
 const partition = 'persist:bolt';
 const browserSession = () => session.fromPartition(partition);
+const workspaceSessions = new Map();
+const workspacePermissionManagers = new Map();
+function workspacePartition(name) {
+  if (name === 'Personal') return partition;
+  const slug = crypto.createHash('sha256').update(String(name)).digest('hex').slice(0, 20);
+  return 'persist:bolt-workspace-' + slug;
+}
+function workspaceSession(name) {
+  const key = workspacePartition(name);
+  if (workspaceSessions.has(key)) return workspaceSessions.get(key);
+  const ses = session.fromPartition(key);
+  const ua = cleanChromeUserAgent(ses.getUserAgent());
+  ses.setUserAgent(ua);
+  ses.webRequest.onBeforeSendHeaders((details, callback) => { details.requestHeaders['User-Agent'] = ua; details.requestHeaders['Accept-Language'] = 'en-US,en;q=0.9'; callback({ requestHeaders: details.requestHeaders }); });
+  ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
+    const blocked = shieldEnabled && !isChromeWebStoreRequest(details) && isBlockedAdRequest(details.url);
+    if (blocked) { blockedRequestCount += 1; send('shield-count', blockedRequestCount); }
+    callback({ cancel: blocked });
+  });
+  const manager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
+  workspaceSessions.set(key, ses);
+  workspacePermissionManagers.set(key, manager);
+  return ses;
+}
 // Electron 35+ exposes extension methods on ses.extensions; older versions expose them on ses.
 const browserExtensions = () => {
   const ses = browserSession();
@@ -269,7 +293,7 @@ function activate(id) {
   activeWorkspace = tabs.get(id).workspace || activeWorkspace;
   layoutViews();
   const wc = tabs.get(id).view.webContents;
-  if (extensionManager) extensionManager.selectTab(wc);
+  if (extensionManager && !tabs.get(id).incognito && (tabs.get(id).workspace || 'Personal') === 'Personal') extensionManager.selectTab(wc);
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   send('reader-state', Boolean(tabs.get(id).readerCssKey));
   send('incognito-state', Boolean(tabs.get(id).incognito));
@@ -306,7 +330,7 @@ function navigateTo(input) {
 function createTab(url = 'bolt://newtab', options = {}) {
   const id = nextTabId++;
   const incognito = options.incognito === true;
-  const tabSession = incognito ? session.fromPartition('bolt-incognito-' + crypto.randomUUID()) : browserSession();
+  const tabSession = incognito ? session.fromPartition('bolt-incognito-' + crypto.randomUUID()) : workspaceSession(activeWorkspace);
   if (incognito) {
     const ua = cleanChromeUserAgent(tabSession.getUserAgent());
     tabSession.setUserAgent(ua);
@@ -325,9 +349,10 @@ function createTab(url = 'bolt://newtab', options = {}) {
   win.contentView.addChildView(view);
   const item = { view, group: '', workspace: activeWorkspace, incognito, tabSession };
   if (incognito) item.permissionManager = configurePermissions({ ses: tabSession, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
+  else item.permissionManager = workspacePermissionManagers.get(workspacePartition(activeWorkspace)) || permissionManager;
   tabs.set(id, item);
   const wc = view.webContents;
-  if (!incognito && extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
+  if (!incognito && activeWorkspace === 'Personal' && extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
   // Keep the session and each embedded page on the same Chrome-like UA.
   wc.setUserAgent(cleanChromeUserAgent(tabSession.getUserAgent()));
   wc.on('ipc-message', async (event, channel, extensionId) => {
@@ -418,7 +443,7 @@ function closeTab(id, fromExtension = false) {
   const item = tabs.get(id);
   if (!item) return;
   tabs.delete(id);
-  if (extensionManager && !fromExtension && !item.incognito) extensionManager.removeTab(item.view.webContents);
+  if (extensionManager && !fromExtension && !item.incognito && (item.workspace || 'Personal') === 'Personal') extensionManager.removeTab(item.view.webContents);
   win?.contentView.removeChildView(item.view);
   if (!item.view.webContents.isDestroyed()) item.view.webContents.close();
   if (item.incognito && item.tabSession) item.tabSession.clearStorageData().catch(error => console.warn('Could not clear incognito data:', error));
@@ -1001,6 +1026,7 @@ app.whenReady().then(async () => {
       if (!win || win.isDestroyed()) throw new Error('Bolt Browser window is not available.');
       if (typeof details.windowId === 'number' && details.windowId !== win.id) throw new Error('The requested browser window is not available.');
       const previousTabId = activeTabId;
+      if (activeWorkspace !== 'Personal') throw new Error('Extensions are currently available only in the Personal workspace.');
       const id = createTab(details.url || 'bolt://newtab');
       const item = tabs.get(id);
       if (details.active === false && previousTabId && tabs.has(previousTabId)) activate(previousTabId);
@@ -1008,7 +1034,7 @@ app.whenReady().then(async () => {
     },
     selectTab: (webContents, browserWindow) => {
       if (!win || browserWindow !== win) return;
-      const entry = [...tabs.entries()].find(([, item]) => item.view.webContents === webContents);
+      const entry = [...tabs.entries()].find(([, item]) => item.view.webContents === webContents && !item.incognito && (item.workspace || 'Personal') === 'Personal');
       if (entry) activate(entry[0]);
     },
     removeTab: webContents => {
