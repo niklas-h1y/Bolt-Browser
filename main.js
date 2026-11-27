@@ -177,13 +177,13 @@ function createTab(url = 'bolt://newtab') {
   else wc.loadURL(navigateTo(url));
   return id;
 }
-function closeTab(id) {
+function closeTab(id, fromExtension = false) {
   const item = tabs.get(id);
   if (!item) return;
   tabs.delete(id);
-  if (extensionManager) extensionManager.removeTab(item.view.webContents);
+  if (extensionManager && !fromExtension) extensionManager.removeTab(item.view.webContents);
   win?.contentView.removeChildView(item.view);
-  item.view.webContents.close();
+  if (!item.view.webContents.isDestroyed()) item.view.webContents.close();
   if (activeTabId === id) {
     const next = [...tabs.keys()].at(-1);
     if (next) activate(next); else createTab();
@@ -354,7 +354,7 @@ app.whenReady().then(async () => {
     },
     removeTab: webContents => {
       const entry = [...tabs.entries()].find(([, item]) => item.view.webContents === webContents);
-      if (entry) closeTab(entry[0]);
+      if (entry) closeTab(entry[0], true);
     }
   });
   ElectronChromeExtensions.handleCRXProtocol(ses);
