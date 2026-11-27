@@ -36,8 +36,11 @@ jobs:
           node --check preload.bundle.js
           node --check permissions.js
 
-      - name: Build PKG installers
-        run: npx electron-builder --mac pkg --x64 --arm64 --publish never
+      - name: Build Intel PKG installer
+        run: npx electron-builder --mac pkg --x64 --publish never
+
+      - name: Build Apple silicon PKG installer
+        run: npx electron-builder --mac pkg --arm64 --publish never
 
       - name: Upload PKG installers
         uses: actions/upload-artifact@v4
