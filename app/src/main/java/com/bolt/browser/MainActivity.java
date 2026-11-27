@@ -280,6 +280,8 @@ public class MainActivity extends Activity {
     }
 
     private Tab current() { return active >= 0 && active < tabs.size() ? tabs.get(active) : null; }
+    private boolean isHomePage(String url) { return url != null && url.startsWith(HOME); }
+    private String withMobileTheme(String url) { return HOME.equals(url) ? HOME + "?theme=" + Uri.encode(mobilePrefs().getString("theme","bolt-dark")) : url; }
 
     private void addTab(String url) {
         Tab tab = new Tab();
@@ -314,13 +316,13 @@ public class MainActivity extends Activity {
             @Override public void onPageStart(GeckoSession session, String pageUrl) {
                 tab.url = pageUrl;
                 runOnUiThread(() -> {
-                    if (current() == tab) { address.setText(pageUrl.equals(HOME) ? "" : pageUrl); status.setText("Loading…"); }
+                    if (current() == tab) { address.setText(isHomePage(pageUrl) ? "" : pageUrl); status.setText("Loading…"); }
                 });
             }
             @Override public void onPageStop(GeckoSession session, boolean success) {
                 if (tab.url != null && tab.url.startsWith("http")) recordHistory(tab.url);
                 runOnUiThread(() -> {
-                    if (current() == tab) { address.setText(tab.url.equals(HOME) ? "" : tab.url); status.setText(tab.title); }
+                    if (current() == tab) { address.setText(isHomePage(tab.url) ? "" : tab.url); status.setText(tab.title); }
                     refreshTabs();
                 });
             }
@@ -329,7 +331,7 @@ public class MainActivity extends Activity {
         tabs.add(tab);
         active = tabs.size()-1;
         webHost.addView(tab.view, new FrameLayout.LayoutParams(-1,-1));
-        tab.session.loadUri(url);
+        tab.session.loadUri(withMobileTheme(url));
         selectTab(active);
     }
 
@@ -340,7 +342,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<tabs.size();i++) tabs.get(i).view.setVisibility(i==active?View.VISIBLE:View.GONE);
         Tab tab=current();
         runtime.getWebExtensionController().setTabActive(tab.session, true);
-        address.setText(tab.url.equals(HOME) || tab.url.equals("about:blank") ? "" : tab.url);
+        address.setText(isHomePage(tab.url) || tab.url.equals("about:blank") ? "" : tab.url);
         status.setText(tab.title);
         refreshTabs();
     }
@@ -375,8 +377,8 @@ public class MainActivity extends Activity {
 
     private void load(String url) {
         if(current()==null) { addTab(url); return; }
-        current().url=url;
-        current().session.loadUri(url);
+        current().url=withMobileTheme(url);
+        current().session.loadUri(withMobileTheme(url));
     }
 
     private void navigateFromAddress() {
