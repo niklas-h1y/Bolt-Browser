@@ -123,7 +123,7 @@ function createTab(url = 'bolt://newtab') {
   const wc = view.webContents;
   attachDevToolsShortcut(wc);
   if (permissionManager) permissionManager.attachWebContents(wc);
-  wc.on('did-create-window', childWindow => { if (permissionManager && childWindow?.webContents) permissionManager.attachWebContents(childWindow.webContents); });
+  wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (permissionManager) permissionManager.attachWebContents(childWindow.webContents); } });
   wc.setWindowOpenHandler(({ url, features }) => {
     let target;
     try { target = new URL(url); } catch { return { action: 'deny' }; }
