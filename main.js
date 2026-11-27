@@ -123,7 +123,7 @@ function send(channel, payload) {
 }
 
 function publicUiSettings() {
-  return { ...uiSettings, newTabBackgroundImage: uiSettings.newTabBackgroundImage ? pathToFileURL(uiSettings.newTabBackgroundImage).href : '' };
+  return { ...uiSettings, newTabBackgroundImage: uiSettings.newTabBackgroundImage && fs.existsSync(uiSettings.newTabBackgroundImage) ? pathToFileURL(uiSettings.newTabBackgroundImage).href : '' };
 }
 function publishUiSettings() {
   const payload = publicUiSettings();
@@ -728,7 +728,8 @@ ipcMain.handle('backup:import', async event => {
     }
   }
   shieldEnabled = backup.shieldEnabled !== false;
-  configureShield(browserSession());
+  blockedRequestCount = 0;
+  send('shield-state', { enabled: shieldEnabled, blocked: blockedRequestCount });
   workspaces = Array.isArray(backup.workspaces) ? [...new Set(backup.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal'];
   if (!workspaces.length) workspaces = ['Personal'];
   if (!workspaces.includes('Personal') && workspaces.length < 12) workspaces.unshift('Personal');
