@@ -322,8 +322,8 @@ async function installCrxBuffer(buffer, expectedId) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     if (manifest.manifest_version !== 3) throw new Error('Only Manifest V3 extensions are supported by Bolt.');
     const requested = [...(manifest.permissions || []), ...(manifest.host_permissions || [])];
-    const approval = await dialog.showMessageBox(win, { type: 'warning', title: 'Review CRX extension permissions', message: 'Install "' + (manifest.name || parsed.id) + '"?', detail: requested.length ? 'This extension requests access to:\\n' + requested.join('\\n') : 'No permissions are declared in its manifest.', buttons: ['Cancel', 'Install extension'], defaultId: 0, cancelId: 0, noLink: true });
-    if (approval.response !== 1) return { canceled: true };
+    const approval = await dialog.showMessageBox(win, { type: 'warning', title: 'Review CRX extension permissions', message: 'Install "' + (manifest.name || parsed.id) + '"?', detail: requested.length ? 'This extension requests access to:\n' + requested.join('\n') : 'No permissions are declared in its manifest.', buttons: ['Cancel', 'Install extension'], defaultId: 0, cancelId: 0, noLink: true });
+    if (approval.response !== 1) { fs.rmSync(staging, { recursive: true, force: true }); return { canceled: true }; }
     manifest.key = parsed.publicKey;
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
     fs.rmSync(target, { recursive: true, force: true });
@@ -432,7 +432,7 @@ ipcMain.handle('extensions:install', async (event) => {
     type: 'warning',
     title: 'Review extension permissions',
     message: 'Install "' + (manifest.name || 'this extension') + '"?',
-    detail: requested.length ? 'This extension requests access to:\\n' + requested.join('\\n') : 'This extension did not declare permissions in its manifest.',
+    detail: requested.length ? 'This extension requests access to:\n' + requested.join('\n') : 'This extension did not declare permissions in its manifest.',
     buttons: ['Cancel', 'Install extension'],
     defaultId: 0,
     cancelId: 0,
@@ -450,6 +450,7 @@ ipcMain.handle('extensions:install-crx-file', async event => {
   if (result.canceled || !result.filePaths[0]) return { canceled: true };
   const buffer = fs.readFileSync(result.filePaths[0]);
   const installed = await installCrxBuffer(buffer);
+  if (installed?.canceled) return installed;
   const approval = await dialog.showMessageBox(win, { type: 'warning', title: 'Extension installed', message: 'Installed ' + installed.name + '.', detail: 'Only use extensions from sources you trust. Review the extension permissions in the extensions manager.', buttons: ['OK'], noLink: true });
   return installed;
 });
