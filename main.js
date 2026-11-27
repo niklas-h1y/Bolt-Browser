@@ -118,8 +118,11 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function publicUiSettings() {
+  return { ...uiSettings, newTabBackgroundImage: uiSettings.newTabBackgroundImage ? pathToFileURL(uiSettings.newTabBackgroundImage).href : '' };
+}
 function publishUiSettings() {
-  const payload = { ...uiSettings };
+  const payload = publicUiSettings();
   if (win && !win.isDestroyed()) win.webContents.send('ui-settings-updated', payload);
 
   for (const { view } of tabs.values()) {
@@ -602,7 +605,7 @@ ipcMain.handle('app:get-info', event => {
 });
 ipcMain.handle('settings:get-ui', event => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
-  return { ...uiSettings };
+  return publicUiSettings();
 });
 ipcMain.handle('settings:set-ui', (event, next) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
@@ -619,7 +622,7 @@ ipcMain.handle('settings:set-ui', (event, next) => {
   if (!restoreSession) { try { fs.rmSync(sessionPath(), { force: true }); } catch (_) {} }
   saveSettings();
   publishUiSettings();
-  return { ...uiSettings };
+  return publicUiSettings();
 });
 ipcMain.handle('settings:pick-background', async event => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
