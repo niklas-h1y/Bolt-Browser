@@ -13,7 +13,14 @@
     "dist:linux": "electron-builder --linux",
     "mobile:add:android": "cap add android",
     "mobile:add:ios": "cap add ios",
-    "mobile:sync": "cap sync"
+    "mobile:sync": "cap sync",
+    "build:preload": "esbuild preload.js --bundle --platform=node --format=cjs --external:electron --outfile=preload.bundle.js",
+    "prestart": "npm run build:preload",
+    "predev": "npm run build:preload",
+    "predist": "npm run build:preload",
+    "predist:win": "npm run build:preload",
+    "predist:mac": "npm run build:preload",
+    "predist:linux": "npm run build:preload"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
@@ -23,7 +30,9 @@
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
     "electron": "^35.0.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "electron-chrome-extensions": "4.10.0",
+    "esbuild": "^0.24.2"
   },
   "build": {
     "appId": "com.bolt.browser",
@@ -36,7 +45,8 @@
       "extensions.html",
       "icon.svg",
       "extensions/**/*",
-      "permissions.js"
+      "permissions.js",
+      "preload.bundle.js"
     ],
     "directories": {
       "output": "dist"
