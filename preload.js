@@ -97,12 +97,14 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     clearNewTabBackground: () => invoke('settings:clear-background'),
     toggleReaderMode: () => invoke('reader:toggle'),
     getResourceStats: () => invoke('resource:get-stats'),
+    getSiteSettings: () => invoke('site:get-settings'),
+    setSiteSettings: settings => invoke('site:set-settings', settings),
     exportBackup: () => invoke('backup:export'),
     importBackup: () => invoke('backup:import'),
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
-      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats'];
+      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated'];
       if (allowed.includes(channel)) ipcRenderer.on(channel, (_event, data) => callback(data));
     }
   });
