@@ -1,17 +1,17 @@
 const { dialog, desktopCapturer } = require('electron');
 
 const DEFAULTS = {
-  camera: true, microphone: true, screenShare: true, geolocation: true,
+  camera: true, cameraPtz: true, microphone: true, screenShare: true, geolocation: true, geolocationApproximate: true,
   bluetooth: true, usb: true, serial: true, hid: true,
   clipboardRead: false, clipboardWrite: true, webxr: true, nfc: true, sensors: true, pointerLock: true, keyboardLock: true, fullscreen: true, notifications: true, midi: true, midiSysex: true, localFonts: true, windowManagement: true, drm: true
 };
 
 const permissionToggle = {
-  geolocation: 'geolocation', 'geolocation-approximate': 'geolocation',
+  geolocation: 'geolocation', 'geolocation-approximate': 'geolocationApproximate',
   'display-capture': 'screenShare', bluetooth: 'bluetooth', usb: 'usb',
   serial: 'serial', hid: 'hid', 'clipboard-read': 'clipboardRead',
   'clipboard-sanitized-write': 'clipboardWrite', vr: 'webxr', ar: 'webxr',
-  'hand-tracking': 'webxr', 'camera-pan-tilt-zoom': 'camera', nfc: 'nfc', accelerometer: 'sensors', gyroscope: 'sensors', magnetometer: 'sensors', pointerLock: 'pointerLock', keyboardLock: 'keyboardLock', fullscreen: 'fullscreen', 'automatic-fullscreen': 'fullscreen', notifications: 'notifications', midi: 'midi', midiSysex: 'midiSysex', 'local-fonts': 'localFonts', 'window-management': 'windowManagement', mediaKeySystem: 'drm'
+  'hand-tracking': 'webxr', 'camera-pan-tilt-zoom': 'cameraPtz', nfc: 'nfc', accelerometer: 'sensors', gyroscope: 'sensors', magnetometer: 'sensors', pointerLock: 'pointerLock', keyboardLock: 'keyboardLock', fullscreen: 'fullscreen', 'automatic-fullscreen': 'fullscreen', notifications: 'notifications', midi: 'midi', midiSysex: 'midiSysex', 'local-fonts': 'localFonts', 'window-management': 'windowManagement', mediaKeySystem: 'drm'
 };
 
 function safeOrigin(value) {
@@ -65,6 +65,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
     }
     const toggle = permissionToggle[permission];
     if (!toggle || !enabled(toggle)) return false;
+    if (permission === 'camera-pan-tilt-zoom' && !enabled('camera')) return false;
     if (['usb', 'serial', 'hid', 'bluetooth'].includes(permission)) return true;
     return hasGrant(origin, permission);
   });
@@ -87,7 +88,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
         return;
       }
       const toggle = permissionToggle[permission];
-      if (!toggle || !enabled(toggle)) return done(false);
+      if (!toggle || !enabled(toggle) || (permission === 'camera-pan-tilt-zoom' && !enabled('camera'))) return done(false);
       const names = {
         geolocation: 'location', 'geolocation-approximate': 'approximate location', nfc: 'NFC', accelerometer: 'motion sensors', gyroscope: 'motion sensors', magnetometer: 'motion sensors', pointerLock: 'pointer lock', keyboardLock: 'keyboard lock', fullscreen: 'fullscreen', 'automatic-fullscreen': 'automatic fullscreen', notifications: 'desktop notifications', midi: 'MIDI', midiSysex: 'MIDI system-exclusive access', 'local-fonts': 'local font access', 'window-management': 'screen enumeration', mediaKeySystem: 'protected media playback (DRM)',
         'display-capture': 'screen sharing', 'clipboard-read': 'read clipboard',
@@ -173,7 +174,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
           if (deviceType) for (const key of [...deviceGrants]) if (key.includes('|' + deviceType + '|')) deviceGrants.delete(key);
         }
       }
-      if (before.camera && !after.camera) for (const key of [...grants]) if (key.endsWith('|media:video')) grants.delete(key);
+      if (before.camera && !after.camera) for (const key of [...grants]) if (key.endsWith('|media:video') || key.endsWith('|camera-pan-tilt-zoom')) grants.delete(key);
       if (before.microphone && !after.microphone) for (const key of [...grants]) if (key.endsWith('|media:audio')) grants.delete(key);
       return after;
     },
