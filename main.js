@@ -5,6 +5,8 @@ const { pathToFileURL } = require('node:url');
 const { configurePermissions, DEFAULTS: DEFAULT_PERMISSION_SETTINGS } = require('./permissions');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'bolt', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+// Set BOLT_GOOGLE_API_KEY in the build environment; never commit a private API key.
+if (process.env.BOLT_GOOGLE_API_KEY && !process.env.GOOGLE_API_KEY) process.env.GOOGLE_API_KEY = process.env.BOLT_GOOGLE_API_KEY;
 
 let win;
 let tabs = new Map();
@@ -161,7 +163,7 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, 'index.html')).catch(error => console.error('Could not load browser UI:', error));
   win.on('resize', layoutViews);
-  win.on('enter-full-screen', () => { send('fullscreen-changed', true); });
+  win.on('enter-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
   win.on('leave-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
   win.on('closed', () => { win = null; tabs.clear(); });
   win.webContents.on('did-finish-load', () => createTab());
