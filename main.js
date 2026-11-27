@@ -358,6 +358,8 @@ app.whenReady().then(async () => {
     }
   });
   ElectronChromeExtensions.handleCRXProtocol(ses);
+  // The toolbar lives in the app window's default session; extension data lives in persist:bolt.
+  ElectronChromeExtensions.handleCRXProtocol(session.defaultSession);
 
   if (process.platform === 'darwin' && typeof app.configureWebAuthn === 'function' && process.env.BOLT_WEBAUTHN_KEYCHAIN_GROUP) {
     app.configureWebAuthn({
