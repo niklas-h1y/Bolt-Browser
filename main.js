@@ -220,7 +220,7 @@ ipcMain.handle('extensions:open-popup', async (event, id) => {
   if (!extension) throw new Error('Extension not found.');
   const popupPath = extension.manifest?.action?.default_popup || extension.manifest?.browser_action?.default_popup;
   if (!popupPath) throw new Error('This extension does not provide a toolbar popup. Electron does not implement Chrome action click events.');
-  const popupUrl = new URL(popupPath.replace(/^\\//, ''), extension.url.endsWith('/') ? extension.url : extension.url + '/').toString();
+  const popupUrl = new URL(popupPath, extension.url.endsWith('/') ? extension.url : extension.url + '/').toString();
   const existing = extensionPopupWindows.get(id);
   if (existing && !existing.isDestroyed()) { existing.show(); existing.focus(); return true; }
   const popup = new BrowserWindow({
