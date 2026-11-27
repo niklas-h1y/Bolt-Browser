@@ -12,6 +12,8 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     remove: id => invoke('extensions:remove', id),
     installCrxFile: () => invoke('extensions:install-crx-file'),
     installCrxUrl: input => invoke('extensions:install-crx-url', input),
+    getUiSettings: () => invoke('settings:get-ui'),
+    setUiSettings: settings => invoke('settings:set-ui', settings),
     getShieldState: () => invoke('shield:get-state'),
     setShieldEnabled: enabled => invoke('shield:set-enabled', enabled)
   });
@@ -33,6 +35,8 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     openDownloads: () => invoke('download:open-folder'),
     getShieldState: () => invoke('shield:get-state'),
     setShieldEnabled: enabled => invoke('shield:set-enabled', enabled),
+    getUiSettings: () => invoke('settings:get-ui'),
+    setUiSettings: settings => invoke('settings:set-ui', settings),
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
