@@ -9,6 +9,8 @@ const { configurePermissions, DEFAULTS: DEFAULT_PERMISSION_SETTINGS } = require(
 const { ElectronChromeExtensions } = require('electron-chrome-extensions');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'bolt', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+// Use an English Chromium locale regardless of the host operating-system language.
+app.commandLine.appendSwitch('lang', 'en-US');
 // Set BOLT_GOOGLE_API_KEY in the build environment; never commit a private API key.
 if (process.env.BOLT_GOOGLE_API_KEY && !process.env.GOOGLE_API_KEY) process.env.GOOGLE_API_KEY = process.env.BOLT_GOOGLE_API_KEY;
 
@@ -157,17 +159,30 @@ function activate(id) {
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   publishTabs();
 }
-function isExtensionsUrl(value) {
-  return /^\s*(?:chrome|bolt):\/\/extensions\/?(?:[?#].*)?\s*$/i.test(String(value || ''));
+function internalPageForUrl(value) {
+  const input = String(value || '').trim();
+  const match = input.match(/^(?:chrome|bolt):\/\/([^/?#]+)(?:[/?#].*)?$/i);
+  if (!match) return null;
+  const page = match[1].toLowerCase();
+  if (page === 'extensions') return 'extensions';
+  if (page === 'newtab') return 'newtab';
+  return 'unsupported';
 }
-function openExtensionsPage(webContents) {
+function isExtensionsUrl(value) { return internalPageForUrl(value) === 'extensions'; }
+function loadInternalPage(webContents, page) {
   if (!webContents || webContents.isDestroyed()) return;
-  webContents.loadFile(path.join(__dirname, 'extensions.html'));
+  const file = page === 'extensions' ? 'extensions.html' : page === 'newtab' ? 'newtab.html' : null;
+  if (file) webContents.loadFile(path.join(__dirname, file));
+  else webContents.executeJavaScript(`document.body.innerHTML = '<main style="font:16px system-ui;padding:40px;color:#ddd;background:#10131b"><h1>Page not available</h1><p>This Chrome internal page is not implemented in Bolt Browser.</p><p>Try <code>chrome://extensions</code> to manage extensions.</p></main>'`).catch(() => {});
 }
+function openExtensionsPage(webContents) { loadInternalPage(webContents, 'extensions'); }
 function navigateTo(input) {
   const value = String(input || '').trim();
   if (!value) return '';
-  if (isExtensionsUrl(value)) return 'bolt://extensions';
+  const internalPage = internalPageForUrl(value);
+  if (internalPage === 'extensions') return 'bolt://extensions';
+  if (internalPage === 'newtab') return 'bolt://newtab';
+  if (internalPage === 'unsupported') return '';
   if (/^(https?:|file:|about:)/i.test(value)) return value;
   if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value) || /^localhost(:\d+)?/.test(value)) return 'https://' + value;
   return 'https://www.google.com/search?q=' + encodeURIComponent(value);
@@ -430,7 +445,9 @@ ipcMain.handle('tab:close', (_e, id) => closeTab(Number(id)));
 ipcMain.handle('tab:navigate', (_e, input) => {
   const item = tabs.get(activeTabId);
   if (!item) return;
-  if (isExtensionsUrl(input)) openExtensionsPage(item.view.webContents);
+  const page = internalPageForUrl(input);
+  if (page === 'extensions' || page === 'newtab') loadInternalPage(item.view.webContents, page);
+  else if (page === 'unsupported') loadInternalPage(item.view.webContents, 'unsupported');
   else item.view.webContents.loadURL(navigateTo(input));
 });
 ipcMain.handle('tab:back', () => { const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
@@ -573,6 +590,7 @@ app.whenReady().then(async () => {
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
     const headers = details.requestHeaders;
     headers['User-Agent'] = cleanUserAgent;
+    headers['Accept-Language'] = 'en-US,en;q=0.9';
     for (const headerName of Object.keys(headers)) {
       if (!/^sec-ch-ua(?:-full-version-list)?$/i.test(headerName)) continue;
       const value = String(headers[headerName] || '');
