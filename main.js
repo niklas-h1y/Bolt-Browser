@@ -25,10 +25,11 @@ let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
 let shieldEnabled = true;
 let blockedRequestCount = 0;
 let shieldRequestListener = null;
+let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab' };
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
-function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; shieldEnabled = saved.shieldEnabled !== false; } catch (_) {} }
-function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, shieldEnabled }, null, 2), 'utf8'); }
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; } catch (_) {} }
+function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, shieldEnabled, uiSettings }, null, 2), 'utf8'); }
 function isBlockedAdRequest(rawUrl) {
   try {
     const u = new URL(rawUrl); const host = u.hostname.toLowerCase(); const pathName = u.pathname.toLowerCase();
@@ -362,7 +363,7 @@ function extensionSummary(extension) {
 function isExtensionsManagerSender(event) {
   try {
     const senderUrl = new URL(event.senderFrame.url);
-    return senderUrl.protocol === 'file:' && ['index.html', 'extensions.html'].includes(path.basename(senderUrl.pathname));
+    return senderUrl.protocol === 'file:' && ['index.html', 'newtab.html', 'extensions.html'].includes(path.basename(senderUrl.pathname));
   } catch (_) { return false; }
 }
 
@@ -386,6 +387,22 @@ ipcMain.handle('tab:home', () => { const wc = tabs.get(activeTabId)?.view.webCon
 ipcMain.handle('download:open-folder', () => shell.openPath(app.getPath('downloads')));
 ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
 ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
+ipcMain.handle('settings:get-ui', event => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
+  return { ...uiSettings };
+});
+ipcMain.handle('settings:set-ui', (event, next) => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
+  if (!next || typeof next !== 'object') throw new Error('Invalid UI settings.');
+  const themes = ['bolt-dark','midnight-neon','oled-black','clean-light'];
+  const theme = themes.includes(next.theme) ? next.theme : uiSettings.theme;
+  const accent = /^#[0-9a-f]{6}$/i.test(String(next.accent || '')) ? next.accent : uiSettings.accent;
+  const engines = ['google','duckduckgo','bing'];
+  const searchEngine = engines.includes(next.searchEngine) ? next.searchEngine : uiSettings.searchEngine;
+  uiSettings = { ...uiSettings, theme, accent, searchEngine, startup: 'newtab' };
+  saveSettings();
+  return { ...uiSettings };
+});
 ipcMain.handle('settings:get-permissions', (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
   return { ...permissionSettings };
