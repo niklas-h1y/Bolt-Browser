@@ -93,6 +93,8 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     setShieldEnabled: enabled => invoke('shield:set-enabled', enabled),
     getUiSettings: () => invoke('settings:get-ui'),
     setUiSettings: settings => invoke('settings:set-ui', settings),
+    pickNewTabBackground: () => invoke('settings:pick-background'),
+    clearNewTabBackground: () => invoke('settings:clear-background'),
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
