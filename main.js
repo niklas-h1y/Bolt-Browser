@@ -679,7 +679,11 @@ ipcMain.handle('backup:import', async event => {
     return { url, group: typeof entry?.group === 'string' ? entry.group.slice(0, 24) : '' };
   }) : [];
   saveSettings();
-  saveSessionNow();
+  if (uiSettings.restoreSession) {
+    fs.mkdirSync(path.dirname(sessionPath()), { recursive: true });
+    const activeIndex = Number.isInteger(backup.activeIndex) ? Math.min(Math.max(backup.activeIndex, 0), Math.max(0, incomingTabs.length - 1)) : 0;
+    fs.writeFileSync(sessionPath(), JSON.stringify({ version: 1, tabs: incomingTabs, activeIndex }, null, 2), { encoding: 'utf8', mode: 0o600 });
+  }
   publishUiSettings();
   return { canceled: false, tabs: incomingTabs.length };
 });
