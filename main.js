@@ -266,8 +266,8 @@ function layoutViews() {
 function activate(id) {
   if (!tabs.has(id)) return;
   activeTabId = id;
-  layoutViews();
   activeWorkspace = tabs.get(id).workspace || activeWorkspace;
+  layoutViews();
   const wc = tabs.get(id).view.webContents;
   if (extensionManager) extensionManager.selectTab(wc);
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
@@ -674,6 +674,7 @@ ipcMain.handle('backup:export', async event => {
     format: 'bolt-browser-backup', version: 1, createdAt: new Date().toISOString(),
     uiSettings: { ...uiSettings, newTabBackgroundImage: '' },
     permissions: { ...permissionSettings },
+    siteOverrides: { ...siteOverrides },
     shieldEnabled,
     tabs: [...tabs.values()].map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '', workspace: item.workspace || 'Personal' })),
     workspaces: [...workspaces], activeWorkspace,
@@ -708,6 +709,18 @@ ipcMain.handle('backup:import', async event => {
     for (const key of Object.keys(DEFAULT_PERMISSION_SETTINGS)) if (typeof backup.permissions[key] === 'boolean') permissionSettings[key] = backup.permissions[key];
     permissionManager?.updateSettings(permissionSettings);
   }
+  siteOverrides = {};
+  if (backup.siteOverrides && typeof backup.siteOverrides === 'object' && !Array.isArray(backup.siteOverrides)) {
+    const allowedSitePermissions = ['camera', 'microphone', 'geolocation', 'notifications', 'clipboard-read', 'display-capture'];
+    for (const [origin, rules] of Object.entries(backup.siteOverrides).slice(0, 500)) {
+      let validOrigin = false;
+      try { const parsed = new URL(origin); validOrigin = ['http:', 'https:'].includes(parsed.protocol) && parsed.origin === origin; } catch (_) {}
+      if (!validOrigin || !rules || typeof rules !== 'object' || Array.isArray(rules)) continue;
+      const cleanRules = {};
+      for (const key of allowedSitePermissions) if (typeof rules[key] === 'boolean') cleanRules[key] = rules[key];
+      if (Object.keys(cleanRules).length) siteOverrides[origin] = cleanRules;
+    }
+  }
   shieldEnabled = backup.shieldEnabled !== false;
   configureShield(browserSession());
   workspaces = Array.isArray(backup.workspaces) ? [...new Set(backup.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal'];
@@ -724,7 +737,7 @@ ipcMain.handle('backup:import', async event => {
     fs.mkdirSync(path.dirname(sessionPath()), { recursive: true });
     const activeIndex = Number.isInteger(backup.activeIndex) ? Math.min(Math.max(backup.activeIndex, 0), Math.max(0, incomingTabs.length - 1)) : 0;
     fs.writeFileSync(sessionPath(), JSON.stringify({ version: 1, tabs: incomingTabs, activeIndex }, null, 2), { encoding: 'utf8', mode: 0o600 });
-  }
+  } else { try { fs.rmSync(sessionPath(), { force: true }); } catch (_) {} }
   publishUiSettings();
   return { canceled: false, tabs: incomingTabs.length };
 });
