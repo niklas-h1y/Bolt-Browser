@@ -142,13 +142,15 @@ public class MainActivity extends Activity {
                         else { pendingAndroidPermissionCallback=callback; requestPermissions(permissions,REQUEST_SITE_PERMISSIONS); }
                     }).setOnCancelListener(d->callback.reject()).show();
             }
-            @Override public void onContentPermissionRequest(GeckoSession requestingSession, String uri, int type, Callback callback) {
-                if (!askSitePermissions()) { callback.reject(); return; }
+            @Override public GeckoResult<Integer> onContentPermissionRequest(GeckoSession requestingSession, GeckoSession.PermissionDelegate.ContentPermission permission) {
+                if (!askSitePermissions()) return GeckoResult.fromValue(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY);
+                GeckoResult<Integer> result = new GeckoResult<>();
                 new AlertDialog.Builder(MainActivity.this).setTitle("Website permission")
-                    .setMessage(uri + " is requesting browser permission (" + type + ").")
-                    .setNegativeButton("Deny",(d,w)->callback.reject())
-                    .setPositiveButton("Allow",(d,w)->callback.grant())
-                    .setOnCancelListener(d->callback.reject()).show();
+                    .setMessage(permission.uri + " is requesting browser permission (" + permission.permission + ").")
+                    .setNegativeButton("Deny",(d,w)->result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY))
+                    .setPositiveButton("Allow",(d,w)->result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW))
+                    .setOnCancelListener(d->result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY)).show();
+                return result;
             }
             @Override public void onMediaPermissionRequest(GeckoSession requestingSession, String uri, MediaSource[] video, MediaSource[] audio, MediaCallback callback) {
                 if (!askSitePermissions()) { callback.reject(); return; }
