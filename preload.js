@@ -74,6 +74,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
 } else if (window.location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('bolt', {
     newTab: url => invoke('tab:new', url),
+    newIncognitoTab: url => invoke('tab:new-incognito', url),
     setOverlayOpen: isOpen => invoke('tab:overlay', isOpen),
     activateTab: id => invoke('tab:activate', id),
     setTabGroup: (id, group) => invoke('tab:set-group', id, group),
@@ -107,7 +108,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     getPermissionSettings: () => invoke('settings:get-permissions'),
     setPermissionSettings: settings => invoke('settings:set-permissions', settings),
     on: (channel, callback) => {
-      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated', 'workspaces-updated', 'reader-state'];
+      const allowed = ['tabs-updated', 'page-state', 'navigation-started', 'browser-error', 'download-started', 'download-progress', 'download-finished', 'fullscreen-changed', 'shield-state', 'shield-count', 'ui-settings-updated', 'resource-stats', 'site-settings-updated', 'workspaces-updated', 'reader-state', 'incognito-state'];
       if (allowed.includes(channel)) ipcRenderer.on(channel, (_event, data) => callback(data));
     }
   });
