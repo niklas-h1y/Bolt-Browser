@@ -36,7 +36,7 @@ function isBlockedAdRequest(rawUrl) {
     const domains = ['doubleclick.net','googlesyndication.com','google-analytics.com','googletagmanager.com','googleadservices.com','adnxs.com','taboola.com','outbrain.com','scorecardresearch.com','adform.net','adroll.com','criteo.com','adsrvr.org','rubiconproject.com','pubmatic.com','openx.net','casalemedia.com','demdex.net','quantserve.com','hotjar.com','segment.io','segment.com','mixpanel.com','amplitude.com','branch.io','appsflyer.com','adjust.com','pixel.facebook.com','connect.facebook.net'];
     if (domains.some(domain => host === domain || host.endsWith('.' + domain))) return true;
     if (host === 'facebook.net' && pathName.startsWith('/tr')) return true;
-    return /(?:^|\\/)(?:ads?|adserver|adservice|analytics|tracking|track|pixel|beacon)(?:[._/-]|$)/i.test(pathName) && /(?:pixel|track|analytics|beacon)/i.test(pathName);
+    return false;
   } catch (_) { return false; }
 }
 function configureShield(ses) {
