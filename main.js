@@ -27,7 +27,7 @@ let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
 let shieldEnabled = true;
 let blockedRequestCount = 0;
 let shieldRequestListener = null;
-let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab', newTabBackground: 'default', restoreSession: true };
+let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab', newTabBackground: 'default', newTabBackgroundImage: '', restoreSession: true };
 let sessionSaveTimer = null;
 let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
@@ -615,11 +615,46 @@ ipcMain.handle('settings:set-ui', (event, next) => {
   const backgrounds = ['default','aurora','ocean','sunset','forest'];
   const newTabBackground = backgrounds.includes(next.newTabBackground) ? next.newTabBackground : uiSettings.newTabBackground;
   const restoreSession = typeof next.restoreSession === 'boolean' ? next.restoreSession : uiSettings.restoreSession;
-  uiSettings = { ...uiSettings, theme, accent, searchEngine, startup: 'newtab', newTabBackground, restoreSession };
+  uiSettings = { ...uiSettings, theme, accent, searchEngine, startup: 'newtab', newTabBackground, restoreSession, newTabBackgroundImage: uiSettings.newTabBackgroundImage || '' };
   if (!restoreSession) { try { fs.rmSync(sessionPath(), { force: true }); } catch (_) {} }
   saveSettings();
   publishUiSettings();
   return { ...uiSettings };
+});
+ipcMain.handle('settings:pick-background', async event => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Choose New Tab background',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+  });
+  if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+  const source = result.filePaths[0];
+  const extension = path.extname(source).toLowerCase();
+  if (!['.png', '.jpg', '.jpeg', '.webp'].includes(extension)) throw new Error('Choose a PNG, JPEG or WebP image.');
+  const stat = fs.statSync(source);
+  if (!stat.isFile() || stat.size > 10 * 1024 * 1024) throw new Error('Background images must be 10 MB or smaller.');
+  const directory = path.join(app.getPath('userData'), 'newtab-backgrounds');
+  fs.mkdirSync(directory, { recursive: true });
+  const destination = path.join(directory, 'background' + extension);
+  fs.copyFileSync(source, destination);
+  uiSettings.newTabBackgroundImage = destination;
+  saveSettings();
+  publishUiSettings();
+  return { canceled: false, url: pathToFileURL(destination).href };
+});
+ipcMain.handle('settings:clear-background', event => {
+  if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
+  const previous = uiSettings.newTabBackgroundImage;
+  uiSettings.newTabBackgroundImage = '';
+  if (previous) {
+    const directory = path.resolve(path.join(app.getPath('userData'), 'newtab-backgrounds'));
+    const candidate = path.resolve(previous);
+    if (candidate.startsWith(directory + path.sep)) { try { fs.rmSync(candidate, { force: true }); } catch (_) {} }
+  }
+  saveSettings();
+  publishUiSettings();
+  return true;
 });
 ipcMain.handle('settings:get-permissions', (event) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
