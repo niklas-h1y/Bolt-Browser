@@ -34,7 +34,7 @@ footer{display:flex;justify-content:center;gap:8px;padding:18px;color:var(--mute
 <script>
 const $=s=>document.querySelector(s);
 let prefs={};try{prefs=JSON.parse(localStorage.getItem('bolt-settings')||'{}')}catch{}
-const legacy={dark:'bolt-dark',light:'clean-light',system:'bolt-dark'};const theme=legacy[prefs.theme]||prefs.theme||'bolt-dark';document.documentElement.dataset.theme=theme;
+const legacy={dark:'bolt-dark',light:'clean-light',system:'bolt-dark'};const theme=new URLSearchParams(location.search).get('theme')||legacy[prefs.theme]||prefs.theme||'bolt-dark';document.documentElement.dataset.theme=theme;
 if(prefs.accent)document.documentElement.style.setProperty('--accent',prefs.accent);
 document.documentElement.style.setProperty('--accent-ink',prefs.accent==='#8bd5ff'?'#10202a':prefs.accent==='#d3a6ff'?'#241331':prefs.accent==='#ffb58a'?'#2a170d':'#17200d');
 function tick(){const d=new Date();$('#clock').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});$('#date').textContent=d.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric',year:'numeric'})}tick();setInterval(tick,15000);
