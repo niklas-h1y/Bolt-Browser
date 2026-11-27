@@ -1,130 +1,150 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101522">
-  <meta name="description" content="Get Bolt Browser for Windows, Android, and Linux.">
-  <title>Get Bolt Browser</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1120">
+  <meta name="description" content="Meet Bolt Browser. Find official downloads, review the source code, and read important security information.">
+  <title>Meet Bolt Browser</title>
   <style>
-    :root { color-scheme: dark; --bg:#0b1020; --panel:#141c2e; --muted:#aab6cc; --text:#f4f7ff; --accent:#7c9cff; --line:#2a3852; }
-    * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:28px 16px; color:var(--text); background:radial-gradient(ellipse at 50% -10%,#25365d 0,transparent 55%),var(--bg); font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    main { width:min(100%,660px); }
-    .card { padding:clamp(24px,5vw,44px); border:1px solid var(--line); border-radius:24px; background:rgba(20,28,46,.94); box-shadow:0 24px 80px #0007; }
-    .brand { display:inline-flex; align-items:center; gap:10px; color:#c8d6ff; font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:.78rem; }
-    .bolt { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:#24375f; color:#a9c0ff; font-size:1.2rem; }
-    h1 { margin:22px 0 8px; font-size:clamp(2rem,7vw,3.2rem); line-height:1.08; letter-spacing:-.04em; }
-    .intro { margin:0; color:var(--muted); font-size:1.05rem; }
-    .notice { margin:24px 0; padding:16px 18px; border:1px solid #31466b; border-radius:14px; background:#192844; color:#dce7ff; }
-    .notice strong { color:#fff; }
-    .trust-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:18px 0; }
-    .trust-item { padding:15px; border:1px solid var(--line); border-radius:13px; background:#101a2b; }
-    .trust-item strong { display:block; margin-bottom:4px; color:#eaf0ff; font-size:.94rem; }
-    .trust-item span { display:block; color:var(--muted); font-size:.84rem; }
-    .release-note { margin:16px 0 0; padding:13px 15px; border-left:3px solid #d5a64c; border-radius:8px; background:#282317; color:#f1dfb8; font-size:.88rem; }
-    .checksum { margin-top:14px; padding:14px; border:1px solid var(--line); border-radius:12px; background:#0d1524; }
-    .checksum strong { display:block; margin-bottom:7px; font-size:.9rem; }
-    .checksum code { display:block; color:#c8d6ff; font-size:.76rem; overflow-wrap:anywhere; user-select:all; }
-    .downloads { display:grid; gap:12px; margin-top:26px; }
-    button { font:inherit; cursor:pointer; }
-    .download { width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 18px; border:1px solid var(--line); border-radius:14px; color:var(--text); background:#1b2740; text-align:left; transition:transform .15s,border-color .15s,background .15s; }
-    .download:hover { transform:translateY(-2px); border-color:#7698ff; background:#223252; }
-    .download.primary { background:#3159b8; border-color:#557de0; }
-    .download.primary:hover { background:#3b68d2; }
-    .download small { display:block; color:#c0cce2; font-size:.83rem; }
-    .arrow { color:#c7d5ff; font-size:1.3rem; }
-    .foot { margin:24px 0 0; color:#8998b2; font-size:.82rem; text-align:center; }
+    :root {
+      color-scheme: dark;
+      --bg-page:#0b1120; --bg-card:#121b2e; --bg-subcard:#172238;
+      --border-subtle:#22304c; --text-main:#f8fafc; --text-muted:#94a3b8;
+      --accent-blue:#3b66d4; --accent-blue-hover:#4975e6;
+      --amber-bg:rgba(217,119,6,.08); --amber-border:rgba(245,158,11,.35);
+      --amber-text:#fde68a;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg-page); color:var(--text-main); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; line-height:1.55; padding:28px 16px; }
+    .bento-grid { display:grid; grid-template-columns:1.6fr 1fr; grid-template-rows:auto auto; grid-template-areas:"privacy downloads" "more-left more-right"; gap:16px; max-width:1120px; margin:0 auto; }
+    .area-privacy { grid-area:privacy; } .area-downloads { grid-area:downloads; } .area-more-left { grid-area:more-left; } .area-more-right { grid-area:more-right; }
+    .bento-card { background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:18px; padding:26px; display:flex; flex-direction:column; gap:18px; min-width:0; }
+    .badge { display:inline-flex; align-items:center; gap:8px; font-size:.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#93c5fd; }
+    .badge-icon { background:#1e293b; border:1px solid #334155; border-radius:6px; padding:3px 7px; font-weight:800; }
+    h1 { font-size:clamp(2rem,5vw,2.8rem); font-weight:800; letter-spacing:-.02em; line-height:1.15; margin-bottom:9px; }
+    .lead { color:var(--text-muted); font-size:1rem; }
+    .notice-amber { background:var(--amber-bg); border:1px solid var(--amber-border); border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:12px; font-size:.92rem; }
+    .notice-amber h2 { font-size:1rem; color:var(--amber-text); }
+    .notice-amber p { color:#e2e8f0; }
+    .section-title { font-size:1.1rem; font-weight:700; }
+    .dl-btn { width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:left; color:var(--text-main); background:var(--bg-subcard); border:1px solid var(--border-subtle); border-radius:12px; padding:14px 16px; transition:background .15s ease,border-color .15s ease; cursor:pointer; font:inherit; }
+    .dl-btn:hover,.dl-btn:focus-visible { border-color:#3b5280; background:#1c2942; outline:none; }
+    .dl-btn.primary { background:var(--accent-blue); border-color:#527ce6; }
+    .dl-btn.primary:hover,.dl-btn.primary:focus-visible { background:var(--accent-blue-hover); }
+    .dl-title { font-weight:600; font-size:.98rem; display:block; }
+    .dl-sub { font-size:.82rem; color:#cbd5e1; display:block; }
+    .release-pill { font-size:.8rem; color:var(--amber-text); background:var(--amber-bg); border:1px solid var(--amber-border); border-radius:10px; padding:10px 12px; }
+    .mini-grid { display:grid; grid-template-columns:1fr; gap:10px; }
+    .mini-box { width:100%; display:block; text-align:left; background:var(--bg-subcard); border:1px solid var(--border-subtle); border-radius:12px; padding:12px 14px; color:inherit; font:inherit; cursor:pointer; }
+    .mini-box:hover,.mini-box:focus-visible { border-color:#3b5280; outline:none; }
+    .mini-box strong { display:block; font-size:.92rem; margin-bottom:2px; }
+    .mini-box span { font-size:.82rem; color:var(--text-muted); }
+    .feature-list { display:grid; gap:12px; }
+    .feature { display:flex; gap:12px; align-items:flex-start; padding:13px 14px; background:var(--bg-subcard); border:1px solid var(--border-subtle); border-radius:12px; }
+    .feature-mark { color:#93c5fd; font-weight:800; font-size:1.1rem; line-height:1.4; }
+    .feature strong { display:block; font-size:.92rem; }
+    .feature span { display:block; color:var(--text-muted); font-size:.82rem; }
+    .sha-box { background:var(--bg-page); border:1px solid var(--border-subtle); border-radius:10px; padding:12px; font-size:.8rem; }
+    .sha-code { display:block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:#93c5fd; word-break:break-all; margin:6px 0; user-select:all; }
+    .copy-hash { margin-top:9px; border:1px solid #3b5280; border-radius:8px; background:#1c2942; color:#dbeafe; padding:7px 10px; font:inherit; font-size:.8rem; cursor:pointer; }
+    .foot { max-width:1120px; margin:20px auto 0; color:#8998b2; font-size:.82rem; text-align:center; }
     .footer-link { border:0; padding:0; color:#b9caff; background:transparent; text-decoration:underline; font:inherit; font-size:inherit; cursor:pointer; }
-    .overlay { position:fixed; inset:0; display:none; place-items:center; padding:18px; background:#050914d9; z-index:5; }
+    .overlay { position:fixed; inset:0; display:none; place-items:center; padding:18px; background:#050914e8; z-index:5; }
     .overlay.open { display:grid; }
     .dialog { width:min(100%,520px); max-height:min(85vh,700px); overflow:auto; padding:24px; border:1px solid #394b6a; border-radius:20px; background:#151f33; box-shadow:0 24px 90px #000a; }
-    .dialog h2 { margin:0 0 8px; font-size:1.45rem; }
-    .dialog p { color:var(--muted); margin:0 0 18px; }
+    .dialog h2 { margin:0 0 8px; font-size:1.4rem; }
+    .dialog p { color:var(--text-muted); margin:0 0 16px; }
     .urlbox { padding:13px; border:1px solid #354663; border-radius:10px; background:#0b1220; color:#dbe5ff; overflow-wrap:anywhere; font-size:.9rem; user-select:all; }
     .actions { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
-    .action { flex:1; min-width:120px; padding:11px 15px; border:1px solid #526b9c; border-radius:10px; background:#3159b8; color:white; font-weight:650; }
+    .action { flex:1; min-width:120px; padding:11px 15px; border:1px solid #526b9c; border-radius:10px; background:#3159b8; color:white; font-weight:650; cursor:pointer; }
     .action.secondary { background:transparent; border-color:#42516b; color:#d8e1f3; }
-    .linux-list { display:grid; gap:10px; margin-top:18px; }
-    .linux-choice { padding:13px 15px; text-align:left; border:1px solid #354663; border-radius:11px; color:var(--text); background:#1b2942; }
-    .linux-choice:hover { border-color:#7698ff; }
-    .linux-choice small { display:block; color:var(--muted); }
+    .linux-list { display:grid; gap:10px; margin-top:14px; }
+    .linux-choice { padding:13px 15px; text-align:left; border:1px solid #354663; border-radius:11px; color:var(--text-main); background:#1b2942; cursor:pointer; font:inherit; }
+    .linux-choice:hover,.linux-choice:focus-visible { border-color:#7698ff; outline:none; }
+    .linux-choice small { display:block; color:var(--text-muted); }
     .status { min-height:1.4em; margin-top:12px; color:#a9c0ff; font-size:.9rem; }
-    @media (max-width:520px) { .trust-grid { grid-template-columns:1fr; } }
+    @media (max-width:840px) { .bento-grid { grid-template-columns:1fr; grid-template-areas:"privacy" "downloads" "more-left" "more-right"; } }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
   </style>
 </head>
 <body>
-  <main>
-    <section class="card" aria-labelledby="title">
-      <div class="brand"><span class="bolt" aria-hidden="true">ϟ</span> Independent browser project</div>
-      <h1 id="title">Meet Bolt Browser.</h1>
-      <p class="intro">A browser built for everyday browsing, with useful tools for people who like to build for the web. If you enjoy the project, try it out and share it.</p>
-
-      <div class="notice">
-        <strong>Security and transparency</strong><br>
-        Bolt Browser is an independent, open-source project. Its source code, release downloads, and build workflows are available in the official GitHub repository, so you can review where the software comes from before installing it. The project has not been presented as independently security-audited, and no software can be guaranteed risk-free. Download only from the official project pages and review permissions before use.
+  <main class="bento-grid">
+    <section class="bento-card area-privacy" aria-labelledby="page-title">
+      <div class="badge"><span class="badge-icon" aria-hidden="true">B</span><span>Independent Browser Project</span></div>
+      <div>
+        <h1 id="page-title">Meet Bolt Browser.</h1>
+        <p class="lead">A browser built for everyday browsing, with useful tools for people who like to build for the web. If you enjoy the project, try it out and share it.</p>
       </div>
-
-      <div class="notice" role="note" aria-label="Security notice" style="border-color:#765b35;background:#292317;color:#f1dfb8">
-        <strong>Security notice</strong><br>
-        Bolt Browser is an independent, open-source project that is still developing. <strong>No independent third-party security audit has been completed.</strong> Although the source code and build workflows are publicly available for inspection, undiscovered vulnerabilities may still exist.
-        <br><br>
-        Web browsers handle sensitive information, including passwords, cookies, browsing sessions, and browsing history. Please consider this before using Bolt for sensitive activities.
-        <br><br>
-        We encourage security researchers and developers to review the source code and responsibly report vulnerabilities through our security policy. Transparency and security improvements are ongoing priorities for Bolt Browser.
+      <div class="notice-amber" role="note" aria-labelledby="security-heading">
+        <h2 id="security-heading">Security &amp; Transparency Notice</h2>
+        <p>Bolt Browser is an independent, open-source project that is still developing. <strong>No independent third-party security audit has been completed.</strong> Although the source code and build workflows are publicly available for inspection, undiscovered vulnerabilities may still exist.</p>
+        <p>Web browsers handle sensitive information, including passwords, cookies, browsing sessions, and browsing history. Please consider this before using Bolt for sensitive activities.</p>
+        <p>We encourage security researchers and developers to review the source code and responsibly report vulnerabilities through our security policy. Transparency and security improvements are ongoing priorities for Bolt Browser.</p>
       </div>
-
-      <div class="trust-grid" aria-label="Project transparency">
-        <div class="trust-item"><strong>Public source code</strong><span>Review the code and project history on GitHub.</span></div>
-        <div class="trust-item"><strong>Visible build workflows</strong><span>Inspect the automated build steps for supported platforms.</span></div>
-        <div class="trust-item"><strong>Release downloads</strong><span>Use the project’s release page rather than third-party mirrors.</span></div>
-        <div class="trust-item"><strong>Security reporting</strong><span>Read the project security policy before reporting a vulnerability.</span></div>
+      <div>
+        <h2 class="section-title">A browser project you can inspect</h2>
+        <p class="lead" style="margin-top:7px">Source code, release history, and automated build definitions are publicly available. Public availability makes review possible; it is not a substitute for an independent security audit.</p>
       </div>
+    </section>
 
-      <div class="release-note"><strong>Release status:</strong> The Windows v1.0.0 download is currently published as a GitHub pre-release. Please treat it as an early release and report problems through the project repository.</div>
-      <div class="checksum">
+    <section class="bento-card area-downloads" aria-labelledby="download-heading">
+      <h2 class="section-title" id="download-heading">Download Bolt</h2>
+      <button class="dl-btn primary" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases/download/v1.0.0/Bolt-Browser-Setup-1.0.0.exe" data-title="Windows installer">
+        <span><span class="dl-title">Download for Windows</span><span class="dl-sub">Windows setup · EXE (v1.0.0)</span></span><span aria-hidden="true">↗</span>
+      </button>
+      <button class="dl-btn" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/android.yml" data-title="Android builds">
+        <span><span class="dl-title">Get Bolt for Android</span><span class="dl-sub">Open Android builds on GitHub to download the APK artifact</span></span><span aria-hidden="true">↗</span>
+      </button>
+      <button class="dl-btn" type="button" id="btn-linux" aria-haspopup="dialog" aria-controls="linux-dialog">
+        <span><span class="dl-title">Linux users — choose a package</span><span class="dl-sub">AppImage · Debian (.deb) · Fedora (.rpm)</span></span><span aria-hidden="true">＋</span>
+      </button>
+      <div class="release-pill"><strong>Release status:</strong> Windows v1.0.0 is currently published as a GitHub pre-release. Treat it as an early release and report issues through the repository.</div>
+    </section>
+
+    <section class="bento-card area-more-left" aria-labelledby="features-heading">
+      <h2 class="section-title" id="features-heading">Built for browsing &amp; building</h2>
+      <div class="feature-list">
+        <div class="feature"><span class="feature-mark" aria-hidden="true">01</span><div><strong>Everyday browsing</strong><span>Tabs, downloads, bookmarks, history, and browsing controls.</span></div></div>
+        <div class="feature"><span class="feature-mark" aria-hidden="true">02</span><div><strong>Developer-focused tools</strong><span>Designed with web development and browser inspection workflows in mind.</span></div></div>
+        <div class="feature"><span class="feature-mark" aria-hidden="true">03</span><div><strong>Multi-platform project</strong><span>Desktop and Android work, with Linux packages built through GitHub Actions.</span></div></div>
+      </div>
+      <p class="lead" style="font-size:.82rem">Features and compatibility may vary by platform and release. Check the release notes for current availability.</p>
+    </section>
+
+    <section class="bento-card area-more-right" aria-labelledby="verify-heading">
+      <h2 class="section-title" id="verify-heading">Verify &amp; Inspect</h2>
+      <div class="mini-grid">
+        <button class="mini-box" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser" data-title="Public source code"><strong>Public source code</strong><span>Review the code and commit history on GitHub.</span></button>
+        <button class="mini-box" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions" data-title="Build workflows"><strong>Visible build workflows</strong><span>Inspect automated build runs and their results.</span></button>
+        <button class="mini-box" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases" data-title="Official releases"><strong>Release downloads</strong><span>Use official GitHub releases instead of third-party mirrors.</span></button>
+        <button class="mini-box" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/blob/main/SECURITY.md" data-title="Security policy"><strong>Security reporting</strong><span>Read SECURITY.md before reporting a vulnerability.</span></button>
+      </div>
+      <div class="sha-box">
         <strong>Windows installer SHA-256</strong>
-        <code>6ef2d3b6cbed9d21140e1a05bdd1adaa441bee8f4925d0e3f4673a0048969560</code>
-        <span style="display:block;margin-top:7px;color:var(--muted);font-size:.8rem">Compare this fingerprint with the installer you downloaded. A matching checksum helps detect file changes; it does not prove that the software is free of vulnerabilities.</span>
+        <code class="sha-code" id="sha-value">6ef2d3b6cbed9d21140e1a05bdd1adaa441bee8f4925d0e3f4673a0048969560</code>
+        <span style="color:var(--text-muted)">Compare the hash with your downloaded installer. A match helps detect file changes; it does not prove the software is free of vulnerabilities.</span>
+        <button class="copy-hash" type="button" id="copy-hash">Copy SHA-256</button>
       </div>
-
-      <div class="downloads" aria-label="Download options">
-        <button class="download primary" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases/download/v1.0.0/Bolt-Browser-Setup-1.0.0.exe" data-title="Windows installer">
-          <span><strong>Download for Windows</strong><small>Windows setup · EXE</small></span><span class="arrow" aria-hidden="true">↗</span>
-        </button>
-        <button class="download" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/android.yml" data-title="Android builds">
-          <span><strong>Get Bolt for Android</strong><small>Open Android builds on GitHub to download the APK artifact</small></span><span class="arrow" aria-hidden="true">↗</span>
-        </button>
-        <button class="download" id="linuxButton" type="button">
-          <span><strong>Linux users — choose a package</strong><small>AppImage · Debian / Ubuntu (.deb) · Fedora / openSUSE (.rpm)</small></span><span class="arrow" aria-hidden="true">＋</span>
-        </button>
-      </div>
-      <p class="foot">Bolt Browser is an independent project.<br>
-        <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser" data-title="Source repository">Source code</button> ·
-        <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases" data-title="Official releases">Official releases</button> ·
-        <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/blob/main/SECURITY.md" data-title="Security policy">Security policy</button>
-      </p>
     </section>
   </main>
 
-  <div class="overlay" id="copyOverlay" role="dialog" aria-modal="true" aria-labelledby="copyTitle">
+  <p class="foot">Bolt Browser is an independent project. <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser" data-title="Source repository">Source code</button> · <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/releases" data-title="Official releases">Official releases</button> · <button class="footer-link" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/blob/main/SECURITY.md" data-title="Security policy">Security policy</button></p>
+
+  <div class="overlay" id="copy-overlay" role="dialog" aria-modal="true" aria-labelledby="copy-title">
     <div class="dialog">
-      <h2 id="copyTitle">Copy download URL</h2>
-      <p id="copyDescription">Copy this official Bolt Browser link.</p>
-      <div class="urlbox" id="urlText"></div>
-      <div class="actions">
-        <button class="action" id="copyButton" type="button">Copy URL</button>
-        <button class="action secondary" type="button" data-close>Close</button>
-      </div>
-      <div class="status" id="copyStatus" aria-live="polite"></div>
+      <h2 id="copy-title">Copy link</h2>
+      <p id="copy-description">Copy this official Bolt Browser link. This page will not open a new window.</p>
+      <div class="urlbox" id="copy-url-text"></div>
+      <div class="actions"><button class="action" id="copy-button" type="button">Copy URL</button><button class="action secondary" type="button" data-close>Close</button></div>
+      <div class="status" id="copy-status" aria-live="polite"></div>
     </div>
   </div>
 
-  <div class="overlay" id="linuxOverlay" role="dialog" aria-modal="true" aria-labelledby="linuxTitle">
+  <div class="overlay" id="linux-dialog" role="dialog" aria-modal="true" aria-labelledby="linux-title">
     <div class="dialog">
-      <h2 id="linuxTitle">Bolt for Linux</h2>
-      <p>Choose your package type. The button will show you the GitHub build page and let you copy its URL; it won't open a new window.</p>
+      <h2 id="linux-title">Bolt for Linux</h2>
+      <p>Choose a package workflow. Copy its official GitHub Actions URL, then open it in your browser to find the latest successful build artifact.</p>
       <div class="linux-list">
         <button class="linux-choice" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/linux-appimage.yml" data-title="Linux AppImage">AppImage <small>Portable package for many Linux distributions</small></button>
         <button class="linux-choice" type="button" data-copy-url="https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/linux-deb.yml" data-title="Linux DEB">DEB <small>Debian, Ubuntu, Linux Mint and derivatives</small></button>
@@ -136,69 +156,91 @@
 
   <script>
     (() => {
-      const copyOverlay = document.getElementById('copyOverlay');
-      const linuxOverlay = document.getElementById('linuxOverlay');
-      const urlText = document.getElementById('urlText');
-      const copyTitle = document.getElementById('copyTitle');
-      const copyDescription = document.getElementById('copyDescription');
-      const copyStatus = document.getElementById('copyStatus');
-      let selectedUrl = '';
+      const copyOverlay = document.getElementById('copy-overlay');
+      const linuxDialog = document.getElementById('linux-dialog');
+      const copyUrlText = document.getElementById('copy-url-text');
+      const copyTitle = document.getElementById('copy-title');
+      const copyStatus = document.getElementById('copy-status');
+      let selectedText = '';
+      let previousFocus = null;
 
-      function showCopy(title, url) {
-        selectedUrl = url;
-        copyTitle.textContent = 'Copy ' + title + ' URL';
-        copyDescription.textContent = 'Copy this official GitHub link. No new window will be opened.';
-        urlText.textContent = url;
+      function openCopyDialog(title, value) {
+        selectedText = value;
+        previousFocus = document.activeElement;
+        copyTitle.textContent = 'Copy ' + title;
+        copyUrlText.textContent = value;
         copyStatus.textContent = '';
-        linuxOverlay.classList.remove('open');
+        linuxDialog.classList.remove('open');
         copyOverlay.classList.add('open');
-        document.getElementById('copyButton').focus();
+        document.getElementById('copy-button').focus();
+      }
+
+      async function copyText(value) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(value);
+          return;
+        }
+        const field = document.createElement('textarea');
+        field.value = value;
+        field.setAttribute('readonly', '');
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.appendChild(field);
+        field.select();
+        const copied = document.execCommand('copy');
+        field.remove();
+        if (!copied) throw new Error('Clipboard access unavailable');
       }
 
       document.querySelectorAll('[data-copy-url]').forEach(button => {
-        button.addEventListener('click', () => showCopy(button.dataset.title, button.dataset.copyUrl));
+        button.addEventListener('click', () => openCopyDialog(button.dataset.title || 'link', button.dataset.copyUrl));
       });
 
-      document.getElementById('linuxButton').addEventListener('click', () => {
-        linuxOverlay.classList.add('open');
-        linuxOverlay.querySelector('[data-close]').focus();
+      document.getElementById('btn-linux').addEventListener('click', () => {
+        previousFocus = document.activeElement;
+        linuxDialog.classList.add('open');
+        linuxDialog.querySelector('[data-copy-url]').focus();
       });
 
-      document.getElementById('copyButton').addEventListener('click', async () => {
+      document.getElementById('copy-button').addEventListener('click', async () => {
         try {
-          if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(selectedUrl);
-          } else {
-            const field = document.createElement('textarea');
-            field.value = selectedUrl;
-            field.style.position = 'fixed';
-            field.style.opacity = '0';
-            document.body.appendChild(field);
-            field.select();
-            const copied = document.execCommand('copy');
-            field.remove();
-            if (!copied) throw new Error('Clipboard unavailable');
-          }
-          copyStatus.textContent = 'URL copied to clipboard.';
+          await copyText(selectedText);
+          copyStatus.textContent = 'Copied to clipboard.';
         } catch {
-          copyStatus.textContent = 'Copy was blocked by the browser. Select the URL above and copy it manually.';
+          copyStatus.textContent = 'Clipboard access was blocked. Select the text above and copy it manually.';
         }
       });
 
-      document.querySelectorAll('[data-close]').forEach(button => {
-        button.addEventListener('click', () => button.closest('.overlay').classList.remove('open'));
+      document.getElementById('copy-hash').addEventListener('click', async () => {
+        try {
+          await copyText(document.getElementById('sha-value').textContent.trim());
+          openCopyDialog('SHA-256 checksum', document.getElementById('sha-value').textContent.trim());
+          copyStatus.textContent = 'SHA-256 copied to clipboard.';
+        } catch {
+          openCopyDialog('SHA-256 checksum', document.getElementById('sha-value').textContent.trim());
+          copyStatus.textContent = 'Select the checksum above and copy it manually.';
+        }
       });
 
-      [copyOverlay, linuxOverlay].forEach(overlay => {
+      function closeDialog(overlay) {
+        overlay.classList.remove('open');
+        if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+      }
+
+      document.querySelectorAll('[data-close]').forEach(button => {
+        button.addEventListener('click', () => closeDialog(button.closest('.overlay')));
+      });
+
+      [copyOverlay, linuxDialog].forEach(overlay => {
         overlay.addEventListener('click', event => {
-          if (event.target === overlay) overlay.classList.remove('open');
+          if (event.target === overlay) closeDialog(overlay);
         });
       });
 
       document.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
-          copyOverlay.classList.remove('open');
-          linuxOverlay.classList.remove('open');
+          if (copyOverlay.classList.contains('open')) closeDialog(copyOverlay);
+          if (linuxDialog.classList.contains('open')) closeDialog(linuxDialog);
         }
       });
     })();
