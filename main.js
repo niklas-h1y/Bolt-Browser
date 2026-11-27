@@ -434,8 +434,8 @@ function createWindow() {
       const stats = await Promise.all([...tabs.entries()].map(async ([id, item]) => {
         try {
           const memory = await item.view.webContents.getProcessMemoryInfo();
-          return { id, title: item.view.webContents.getTitle() || 'New tab', memoryMB: Math.round((memory.residentSet || memory.private || 0) / 1024) };
-        } catch (_) { return { id, title: 'Unavailable', memoryMB: null }; }
+          return { id, title: item.view.webContents.getTitle() || 'New tab', url: displayUrl(item.view.webContents.getURL()), memoryMB: Math.round((memory.residentSet || memory.private || 0) / 1024) };
+        } catch (_) { return { id, title: 'Unavailable', url: '', memoryMB: null }; }
       }));
       send('resource-stats', stats);
     }, 2500);
