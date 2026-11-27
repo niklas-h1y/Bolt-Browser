@@ -227,7 +227,8 @@ function saveSessionNow() {
       group: typeof item.group === 'string' ? item.group.slice(0, 24) : '',
       workspace: item.workspace || 'Personal'
     }));
-    const activeIndex = Math.max(0, [...tabs.keys()].indexOf(activeTabId));
+    const persistentIds = [...tabs.entries()].filter(([, item]) => !item.incognito).map(([id]) => id);
+    const activeIndex = Math.max(0, persistentIds.indexOf(activeTabId));
     fs.mkdirSync(path.dirname(sessionPath()), { recursive: true });
     fs.writeFileSync(sessionPath(), JSON.stringify({ version: 1, tabs: entries, activeIndex }, null, 2), { encoding: 'utf8', mode: 0o600 });
   } catch (error) { console.error('Could not save browser session:', error); }
@@ -257,7 +258,7 @@ function restoreSession() {
       if (!valid) url = 'bolt://newtab';
       const entryWorkspace = typeof entry.workspace === 'string' && /^[\\w -]{1,24}$/.test(entry.workspace) ? entry.workspace : 'Personal';
       if (!workspaces.includes(entryWorkspace) && workspaces.length < 12) workspaces.push(entryWorkspace);
-      const id = createTab(url);
+      const id = createTab(url, { workspace: entryWorkspace });
       const item = tabs.get(id);
       if (item && typeof entry.group === 'string') item.group = entry.group.slice(0, 24);
       if (item) item.workspace = entryWorkspace;
@@ -330,7 +331,8 @@ function navigateTo(input) {
 function createTab(url = 'bolt://newtab', options = {}) {
   const id = nextTabId++;
   const incognito = options.incognito === true;
-  const tabSession = incognito ? session.fromPartition('bolt-incognito-' + crypto.randomUUID()) : workspaceSession(activeWorkspace);
+  const tabWorkspace = typeof options.workspace === 'string' && workspaces.includes(options.workspace) ? options.workspace : activeWorkspace;
+  const tabSession = incognito ? session.fromPartition('bolt-incognito-' + crypto.randomUUID()) : workspaceSession(tabWorkspace);
   if (incognito) {
     const ua = cleanChromeUserAgent(tabSession.getUserAgent());
     tabSession.setUserAgent(ua);
@@ -347,7 +349,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
     }
   });
   win.contentView.addChildView(view);
-  const item = { view, group: '', workspace: activeWorkspace, incognito, tabSession };
+  const item = { view, group: '', workspace: tabWorkspace, incognito, tabSession };
   if (incognito) item.permissionManager = configurePermissions({ ses: tabSession, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
   else item.permissionManager = workspacePermissionManagers.get(workspacePartition(activeWorkspace)) || permissionManager;
   tabs.set(id, item);
@@ -723,7 +725,7 @@ ipcMain.handle('backup:export', async event => {
     shieldEnabled,
     tabs: [...tabs.values()].filter(item => !item.incognito).map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '', workspace: item.workspace || 'Personal' })),
     workspaces: [...workspaces], activeWorkspace,
-    activeIndex: Math.max(0, [...tabs.keys()].indexOf(activeTabId))
+    activeIndex: Math.max(0, [...tabs.entries()].filter(([, item]) => !item.incognito).map(([id]) => id).indexOf(activeTabId))
   };
   fs.writeFileSync(result.filePath, JSON.stringify(backup, null, 2), { encoding: 'utf8', mode: 0o600 });
   return { canceled: false, path: result.filePath };
@@ -895,6 +897,8 @@ ipcMain.handle('settings:set-permissions', (event, next) => {
   if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.');
   if (!next || typeof next !== 'object') throw new Error('Invalid permission settings.');
   permissionSettings = permissionManager ? permissionManager.updateSettings({ ...permissionSettings, ...next }) : { ...DEFAULT_PERMISSION_SETTINGS, ...next };
+  for (const manager of workspacePermissionManagers.values()) manager.updateSettings({ ...permissionSettings });
+  for (const item of tabs.values()) if (item.incognito && item.permissionManager) item.permissionManager.updateSettings({ ...permissionSettings });
   saveSettings();
   return { ...permissionSettings };
 });
