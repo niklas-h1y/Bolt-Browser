@@ -29,6 +29,7 @@ let blockedRequestCount = 0;
 let shieldRequestListener = null;
 let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab', newTabBackground: 'default', newTabBackgroundImage: '', restoreSession: true };
 let sessionSaveTimer = null;
+let resourceMonitorTimer = null;
 let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
@@ -417,6 +418,15 @@ function createWindow() {
   win.on('closed', () => { saveSessionNow(); win = null; tabs.clear(); });
   win.webContents.on('did-finish-load', () => {
     restoreSession();
+    if (!resourceMonitorTimer) resourceMonitorTimer = setInterval(async () => {
+      const stats = await Promise.all([...tabs.entries()].map(async ([id, item]) => {
+        try {
+          const memory = await item.view.webContents.getProcessMemoryInfo();
+          return { id, title: item.view.webContents.getTitle() || 'New tab', memoryMB: Math.round((memory.residentSet || memory.private || 0) / 1024) };
+        } catch (_) { return { id, title: 'Unavailable', memoryMB: null }; }
+      }));
+      send('resource-stats', stats);
+    }, 2500);
     if (pendingProtocolUrl) { const url = pendingProtocolUrl; pendingProtocolUrl = null; handleExternalProtocol(url); }
   });
 }
@@ -592,6 +602,88 @@ ipcMain.handle('tab:forward', event => { if (!isAppUiSender(event)) throw new Er
 ipcMain.handle('tab:reload', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return tabs.get(activeTabId)?.view.webContents.reload(); });
 ipcMain.handle('tab:home', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return shell.openPath(app.getPath('downloads')); });
+ipcMain.handle('reader:toggle', async event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const item = tabs.get(activeTabId);
+  if (!item) return false;
+  const wc = item.view.webContents;
+  if (item.readerCssKey) {
+    try { await wc.removeInsertedCSS(item.readerCssKey); } catch (_) {}
+    item.readerCssKey = null;
+    return false;
+  }
+  const css = `
+    html { background: #f5f0e6 !important; color: #24231f !important; }
+    body { background: #f5f0e6 !important; color: #24231f !important; font-family: Georgia, 'Times New Roman', serif !important; font-size: 19px !important; line-height: 1.75 !important; }
+    nav, header, footer, aside, [role="navigation"], [role="banner"], [role="complementary"],
+    [aria-label*="advert" i], [id*="advert" i], [class*="advert" i], [id*="cookie" i], [class*="cookie" i],
+    [id*="popup" i], [class*="popup" i], [id*="modal" i], [class*="modal" i] { display: none !important; }
+    article, main, [role="main"] { max-width: 820px !important; margin: 32px auto !important; padding: 32px !important; background: #fffdf8 !important; color: #24231f !important; box-shadow: 0 8px 40px #0001 !important; }
+    p, li { max-width: 72ch !important; }
+    img, video { max-width: 100% !important; height: auto !important; }
+    a { color: #245c8a !important; }
+  `;
+  item.readerCssKey = await wc.insertCSS(css);
+  return true;
+});
+ipcMain.handle('resource:get-stats', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  return snapshot().map(tab => ({ id: tab.id, title: tab.title, url: tab.url }));
+});
+ipcMain.handle('backup:export', async event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const result = await dialog.showSaveDialog(win, { title: 'Export Bolt Browser backup', defaultPath: 'Bolt-Browser-Backup.json', filters: [{ name: 'Bolt backup', extensions: ['json'] }] });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const backup = {
+    format: 'bolt-browser-backup', version: 1, createdAt: new Date().toISOString(),
+    uiSettings: { ...uiSettings, newTabBackgroundImage: '' },
+    permissions: { ...permissionSettings },
+    shieldEnabled,
+    tabs: [...tabs.values()].map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '' })),
+    activeIndex: Math.max(0, [...tabs.keys()].indexOf(activeTabId))
+  };
+  fs.writeFileSync(result.filePath, JSON.stringify(backup, null, 2), { encoding: 'utf8', mode: 0o600 });
+  return { canceled: false, path: result.filePath };
+});
+ipcMain.handle('backup:import', async event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const result = await dialog.showOpenDialog(win, { title: 'Import Bolt Browser backup', properties: ['openFile'], filters: [{ name: 'Bolt backup', extensions: ['json'] }] });
+  if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+  const stat = fs.statSync(result.filePaths[0]);
+  if (!stat.isFile() || stat.size > 2 * 1024 * 1024) throw new Error('Backup file is too large or invalid.');
+  const backup = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
+  if (backup?.format !== 'bolt-browser-backup' || backup.version !== 1) throw new Error('This is not a supported Bolt Browser backup.');
+  const incomingUi = backup.uiSettings && typeof backup.uiSettings === 'object' ? backup.uiSettings : {};
+  const themes = ['bolt-dark','midnight-neon','oled-black','clean-light'];
+  const engines = ['google','duckduckgo','bing'];
+  const backgrounds = ['default','aurora','ocean','sunset','forest'];
+  uiSettings = {
+    ...uiSettings,
+    theme: themes.includes(incomingUi.theme) ? incomingUi.theme : uiSettings.theme,
+    accent: /^#[0-9a-f]{6}$/i.test(String(incomingUi.accent || '')) ? incomingUi.accent.toLowerCase() : uiSettings.accent,
+    searchEngine: engines.includes(incomingUi.searchEngine) ? incomingUi.searchEngine : uiSettings.searchEngine,
+    newTabBackground: backgrounds.includes(incomingUi.newTabBackground) ? incomingUi.newTabBackground : uiSettings.newTabBackground,
+    restoreSession: incomingUi.restoreSession !== false,
+    newTabBackgroundImage: ''
+  };
+  if (backup.permissions && typeof backup.permissions === 'object') {
+    permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
+    for (const key of Object.keys(DEFAULT_PERMISSION_SETTINGS)) if (typeof backup.permissions[key] === 'boolean') permissionSettings[key] = backup.permissions[key];
+    permissionManager?.updateSettings(permissionSettings);
+  }
+  shieldEnabled = backup.shieldEnabled !== false;
+  configureShield(browserSession());
+  const incomingTabs = Array.isArray(backup.tabs) ? backup.tabs.slice(0, 50).map(entry => {
+    let url = typeof entry?.url === 'string' ? entry.url : 'bolt://newtab';
+    try { const parsed = new URL(url); if (!(['http:', 'https:'].includes(parsed.protocol) || (parsed.protocol === 'bolt:' && ['newtab','extensions'].includes(parsed.hostname)))) url = 'bolt://newtab'; } catch (_) { url = 'bolt://newtab'; }
+    return { url, group: typeof entry?.group === 'string' ? entry.group.slice(0, 24) : '' };
+  }) : [];
+  saveSettings();
+  saveSessionNow();
+  publishUiSettings();
+  return { canceled: false, tabs: incomingTabs.length };
+});
+
 ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
 ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
 ipcMain.handle('app:get-info', event => {
@@ -759,7 +851,7 @@ ipcMain.handle('extensions:remove', async (event, id) => {
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('com.bolt.browser');
-  app.on('before-quit', () => { clearTimeout(sessionSaveTimer); saveSessionNow(); });
+  app.on('before-quit', () => { clearTimeout(sessionSaveTimer); if (resourceMonitorTimer) clearInterval(resourceMonitorTimer); saveSessionNow(); });
   if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient('bolt', process.execPath, [path.resolve(process.argv[1])]);
   else app.setAsDefaultProtocolClient('bolt');
   Menu.setApplicationMenu(null);
