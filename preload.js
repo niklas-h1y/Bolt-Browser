@@ -1,4 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { injectBrowserAction } = require('electron-chrome-extensions/browser-action');
+
+if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/index.html')) {
+  injectBrowserAction();
+}
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/extensions.html')) {
