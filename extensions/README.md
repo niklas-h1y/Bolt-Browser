@@ -6,14 +6,17 @@ This folder is the repository's extension library. Add each extension in its own
 
 ### Desktop (Electron / Chromium)
 
-The desktop edition loads **unpacked Chromium extensions using Manifest V3**:
+The desktop edition loads **unpacked Chromium extensions using Manifest V3** and uses [`electron-chrome-extensions`](https://github.com/samuelmaddock/electron-browser-shell/tree/master/packages/electron-chrome-extensions) to provide browser-style extension integration:
 
 - A `manifest.json` file at the extension folder root.
 - `manifest_version: 3`.
 - Content scripts declared with `content_scripts`.
+- Browser action icons and popups in Bolt's toolbar, including per-tab badges and dynamic action state.
+- Common extension APIs including `chrome.tabs`, `chrome.windows`, `chrome.runtime`, `chrome.storage`, `chrome.cookies`, `chrome.contextMenus`, `chrome.notifications`, and `chrome.webNavigation`, subject to the library's supported API list and Electron limitations.
+- Extension-created tabs are integrated with Bolt's tab strip; action context-menu items are shown in the page context menu.
 - Static assets (JavaScript, CSS, icons) referenced with paths relative to the extension folder.
 
-Open `chrome://extensions` or `bolt://extensions` in the desktop address bar to open Bolt's built-in Extensions manager. Choose **Load unpacked** and select the folder containing `manifest.json`. The manager lists each loaded extension's name, version, ID and description and lets you remove it. Manually loaded extension folder paths are saved in Electron's user data directory and restored when Bolt starts again.
+Open `chrome://extensions` or `bolt://extensions` in the desktop address bar to open Bolt's built-in Extensions manager. Choose **Load unpacked** and select the folder containing `manifest.json`. The manager lists each loaded extension's name, version, ID and description and lets you remove it. Loaded extensions are also restored after restart. Manually loaded extension folder paths are saved in Electron's user data directory and restored when Bolt starts again.
 
 ### Android (Mozilla GeckoView / Firefox engine)
 
@@ -32,7 +35,8 @@ iOS/WebKit does not provide the same Chromium or GeckoView extension runtime. De
 
 ## Compatibility and safety
 
-- Desktop compatibility depends on the extension APIs supported by the version of Electron bundled with Bolt; not every Chrome extension API or Chrome Web Store extension is guaranteed to work.
+- Desktop compatibility depends on the extension APIs supported by the version of Electron bundled with Bolt and by `electron-chrome-extensions`; not every Chrome extension API or Chrome Web Store extension is guaranteed to work.
+- The extension integration package is MIT-licensed. Its preload bundle is built automatically before development launches and desktop packaging.
 - Install only extensions whose source you trust. Extensions can read or modify pages when their permissions allow it.
 
 ## Adding an extension
