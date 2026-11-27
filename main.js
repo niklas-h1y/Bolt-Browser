@@ -567,10 +567,24 @@ app.whenReady().then(async () => {
   const cleanUserAgent = cleanChromeUserAgent(ses.getUserAgent());
   ses.setUserAgent(cleanUserAgent);
   configureShield(ses);
-  // Keep the request header consistent with the session and embedded webContents.
+  // Keep request headers consistent with the cleaned session UA. Electron's
+  // brand can also appear in Chromium Client Hints; remove only that brand and
+  // preserve the remaining Chromium brand/version entries.
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['User-Agent'] = cleanUserAgent;
-    callback({ requestHeaders: details.requestHeaders });
+    const headers = details.requestHeaders;
+    headers['User-Agent'] = cleanUserAgent;
+    for (const headerName of Object.keys(headers)) {
+      if (!/^sec-ch-ua(?:-full-version-list)?$/i.test(headerName)) continue;
+      const value = String(headers[headerName] || '');
+      const cleaned = value
+        .split(/,\s*(?=(?:"|'))/)
+        .filter(entry => !/"Electron"\s*;\s*v\s*=|\bElectron\b/i.test(entry))
+        .join(', ')
+        .trim();
+      if (cleaned) headers[headerName] = cleaned;
+      else delete headers[headerName];
+    }
+    callback({ requestHeaders: headers });
   });
   permissionManager = configurePermissions({ ses, getWindow: () => win, getSettings: () => permissionSettings });
   extensionManager = new ElectronChromeExtensions({
