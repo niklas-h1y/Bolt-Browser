@@ -180,6 +180,8 @@ function configurePermissions({ ses, getWindow, getSettings }) {
         event.preventDefault();
         const origin = safeOrigin(webContents.getURL());
         if (!enabled('bluetooth') || !origin) return callback('');
+        // Electron may emit this event before scanning has discovered any devices. Leave the callback pending so a later event can supply the updated list.
+        if (!deviceList?.length) return;
         try {
           const device = await chooseDevice('Select Bluetooth device', deviceList, 'bluetooth');
           callback(device?.deviceId || '');
