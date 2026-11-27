@@ -124,7 +124,7 @@ public class MainActivity extends Activity {
         String[] ids={"bolt-dark","midnight-neon","oled-black","clean-light"};
         new AlertDialog.Builder(this).setTitle("Choose theme").setSingleChoiceItems(themes, java.util.Arrays.asList(ids).indexOf(mobilePrefs().getString("theme","bolt-dark")),(dialog,which)->{
             mobilePrefs().edit().putString("theme",ids[which]).apply(); applyMobileTheme();
-            if(root!=null){root.setBackgroundColor(BG);buildChrome();for(Tab tab:tabs){if(tab.view.getParent()!=null)((ViewGroup)tab.view.getParent()).removeView(tab.view);webHost.addView(tab.view,new FrameLayout.LayoutParams(-1,-1));}selectTab(Math.max(0,active));}
+            if(root!=null){root.setBackgroundColor(BG);buildChrome();for(Tab tab:tabs){if(tab.view.getParent()!=null)((ViewGroup)tab.view.getParent()).removeView(tab.view);webHost.addView(tab.view,new FrameLayout.LayoutParams(-1,-1));if(isHomePage(tab.url)){tab.url=withMobileTheme(HOME);tab.session.loadUri(tab.url);}}selectTab(Math.max(0,active));updateShieldLabel();}
             dialog.dismiss();
         }).setNegativeButton("Cancel",null).show();
     }
@@ -283,7 +283,7 @@ public class MainActivity extends Activity {
 
     private Tab current() { return active >= 0 && active < tabs.size() ? tabs.get(active) : null; }
     private boolean isHomePage(String url) { return url != null && url.startsWith(HOME); }
-    private String withMobileTheme(String url) { return HOME.equals(url) ? HOME + "?theme=" + Uri.encode(mobilePrefs().getString("theme","bolt-dark")) : url; }
+    private String withMobileTheme(String url) { return isHomePage(url) ? HOME + "?theme=" + Uri.encode(mobilePrefs().getString("theme","bolt-dark")) : url; }
 
     private void addTab(String url) {
         Tab tab = new Tab();
@@ -406,7 +406,7 @@ public class MainActivity extends Activity {
     }
 
     private void saveBookmark() {
-        Tab tab=current(); if(tab==null || tab.url.equals(HOME)) { Toast.makeText(this,"Open a website first",Toast.LENGTH_SHORT).show(); return; }
+        Tab tab=current(); if(tab==null || isHomePage(tab.url)) { Toast.makeText(this,"Open a website first",Toast.LENGTH_SHORT).show(); return; }
         Set<String> saved=new HashSet<>(getPreferences(MODE_PRIVATE).getStringSet("bookmarks",new HashSet<>()));
         saved.add(tab.url);
         getPreferences(MODE_PRIVATE).edit().putStringSet("bookmarks",saved).apply();
