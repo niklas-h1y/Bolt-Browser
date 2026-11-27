@@ -14,6 +14,9 @@ import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.Manifest;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -24,6 +27,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.mozilla.geckoview.AllowOrDeny;
+import org.mozilla.geckoview.ContentBlocking;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
@@ -42,12 +46,12 @@ import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends Activity {
-    private static final int BG = Color.rgb(17,18,16);
-    private static final int PANEL = Color.rgb(25,27,24);
-    private static final int PANEL2 = Color.rgb(34,37,32);
-    private static final int TEXT = Color.rgb(242,244,237);
-    private static final int MUTED = Color.rgb(146,152,140);
-    private static final int ACCENT = Color.rgb(184,243,107);
+    private static int BG = Color.rgb(17,18,16);
+    private static int PANEL = Color.rgb(25,27,24);
+    private static int PANEL2 = Color.rgb(34,37,32);
+    private static int TEXT = Color.rgb(242,244,237);
+    private static int MUTED = Color.rgb(146,152,140);
+    private static int ACCENT = Color.rgb(184,243,107);
     private static final String HOME = "resource://android/assets/index.html";
     private static final int PICK_EXTENSION = 4102;
 
@@ -58,6 +62,10 @@ public class MainActivity extends Activity {
     private TextView status;
     private final ArrayList<Tab> tabs = new ArrayList<>();
     private int active = -1;
+    private int blockedTrackers = 0;
+    private boolean shieldEnabled = true;
+    private GeckoSession.PermissionDelegate.Callback pendingAndroidPermissionCallback;
+    private static final int REQUEST_SITE_PERMISSIONS = 4103;
 
     private static class Tab {
         GeckoSession session;
@@ -70,10 +78,94 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+        loadMobilePreferences();
+        applyMobileTheme();
         if (runtime == null) runtime = GeckoRuntime.create(this);
+        runtime.getSettings().getContentBlocking().setEnhancedTrackingProtectionLevel(ContentBlocking.EtpLevel.STRICT);
         configureExtensionPrompts();
         buildChrome();
         addTab(HOME);
+        showWelcomeIfNeeded();
+    }
+
+    private SharedPreferences mobilePrefs() { return getSharedPreferences("bolt-browser", MODE_PRIVATE); }
+    private void loadMobilePreferences() { shieldEnabled = mobilePrefs().getBoolean("shield_enabled", true); }
+    private void applyMobileTheme() {
+        String theme = mobilePrefs().getString("theme", "bolt-dark");
+        if ("midnight-neon".equals(theme)) { BG=Color.rgb(9,11,24); PANEL=Color.rgb(17,21,42); PANEL2=Color.rgb(26,32,64); TEXT=Color.rgb(237,243,255); MUTED=Color.rgb(152,166,202); ACCENT=Color.rgb(139,213,255); }
+        else if ("oled-black".equals(theme)) { BG=Color.BLACK; PANEL=Color.rgb(8,8,8); PANEL2=Color.rgb(20,20,20); TEXT=Color.rgb(245,245,245); MUTED=Color.rgb(160,160,160); ACCENT=Color.rgb(184,243,107); }
+        else if ("clean-light".equals(theme)) { BG=Color.rgb(246,247,243); PANEL=Color.WHITE; PANEL2=Color.rgb(237,240,232); TEXT=Color.rgb(32,37,29); MUTED=Color.rgb(116,124,108); ACCENT=Color.rgb(66,107,31); }
+        else { BG=Color.rgb(17,18,16); PANEL=Color.rgb(25,27,24); PANEL2=Color.rgb(34,37,32); TEXT=Color.rgb(242,244,237); MUTED=Color.rgb(146,152,140); ACCENT=Color.rgb(184,243,107); }
+        if (getWindow()!=null) { getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG); }
+    }
+    private boolean askSitePermissions() { return "ask".equals(mobilePrefs().getString("permission_mode", "secure")); }
+    private void showWelcomeIfNeeded() {
+        if (mobilePrefs().getBoolean("welcome_complete", false)) return;
+        new AlertDialog.Builder(this).setTitle("Welcome to Bolt Browser")
+            .setMessage("Choose how websites can access your location, camera, microphone and other device features. You can change this later in Settings.")
+            .setNegativeButton("Security-Friendly Defaults", (d,w) -> mobilePrefs().edit().putString("permission_mode","secure").putBoolean("welcome_complete",true).apply())
+            .setPositiveButton("Ask / Allow Permissions", (d,w) -> mobilePrefs().edit().putString("permission_mode","ask").putBoolean("welcome_complete",true).apply())
+            .setCancelable(false).show();
+    }
+    private void updateShieldLabel() {
+        if (status != null) status.setText((shieldEnabled ? "Shield on" : "Shield off") + " · " + blockedTrackers + " trackers blocked");
+    }
+    private void setShieldEnabled(boolean enabled) {
+        shieldEnabled = enabled; mobilePrefs().edit().putBoolean("shield_enabled", enabled).apply();
+        if (!enabled) blockedTrackers = 0;
+        for (Tab tab : tabs) tab.session.getSettings().setUseTrackingProtection(enabled);
+        updateShieldLabel();
+        Toast.makeText(this, enabled ? "Ad and tracker blocking enabled" : "Ad and tracker blocking disabled", Toast.LENGTH_SHORT).show();
+    }
+    private void showThemePicker() {
+        String[] themes={"Bolt Dark","Midnight Neon","OLED Pitch Black","Clean Light"};
+        String[] ids={"bolt-dark","midnight-neon","oled-black","clean-light"};
+        new AlertDialog.Builder(this).setTitle("Choose theme").setSingleChoiceItems(themes, java.util.Arrays.asList(ids).indexOf(mobilePrefs().getString("theme","bolt-dark")),(dialog,which)->{
+            mobilePrefs().edit().putString("theme",ids[which]).apply(); applyMobileTheme();
+            if(root!=null){root.setBackgroundColor(BG);buildChrome();for(Tab tab:tabs){if(tab.view.getParent()!=null)((ViewGroup)tab.view.getParent()).removeView(tab.view);webHost.addView(tab.view,new FrameLayout.LayoutParams(-1,-1));}selectTab(Math.max(0,active));}
+            dialog.dismiss();
+        }).setNegativeButton("Cancel",null).show();
+    }
+    private void configureSitePermissionDelegate(GeckoSession session) {
+        session.setPermissionDelegate(new GeckoSession.PermissionDelegate() {
+            @Override public void onAndroidPermissionsRequest(GeckoSession requestingSession, String[] permissions, Callback callback) {
+                if (!askSitePermissions()) { callback.reject(); return; }
+                new AlertDialog.Builder(MainActivity.this).setTitle("Device permission")
+                    .setMessage("A website wants Android permissions: " + java.util.Arrays.toString(permissions))
+                    .setNegativeButton("Deny", (d,w)->callback.reject())
+                    .setPositiveButton("Continue", (d,w)->{
+                        boolean alreadyGranted=true;
+                        for(String permission:permissions) if(checkSelfPermission(permission)!=PackageManager.PERMISSION_GRANTED) alreadyGranted=false;
+                        if(alreadyGranted) callback.grant();
+                        else { pendingAndroidPermissionCallback=callback; requestPermissions(permissions,REQUEST_SITE_PERMISSIONS); }
+                    }).setOnCancelListener(d->callback.reject()).show();
+            }
+            @Override public void onContentPermissionRequest(GeckoSession requestingSession, String uri, int type, Callback callback) {
+                if (!askSitePermissions()) { callback.reject(); return; }
+                new AlertDialog.Builder(MainActivity.this).setTitle("Website permission")
+                    .setMessage(uri + " is requesting browser permission (" + type + ").")
+                    .setNegativeButton("Deny",(d,w)->callback.reject())
+                    .setPositiveButton("Allow",(d,w)->callback.grant())
+                    .setOnCancelListener(d->callback.reject()).show();
+            }
+            @Override public void onMediaPermissionRequest(GeckoSession requestingSession, String uri, MediaSource[] video, MediaSource[] audio, MediaCallback callback) {
+                if (!askSitePermissions()) { callback.reject(); return; }
+                new AlertDialog.Builder(MainActivity.this).setTitle("Camera / microphone access")
+                    .setMessage(uri + " wants to use " + (video!=null?"the camera ":"") + (audio!=null?"the microphone":"") + ".")
+                    .setNegativeButton("Deny",(d,w)->callback.reject())
+                    .setPositiveButton("Allow",(d,w)->callback.grant(video!=null&&video.length>0?video[0]:null,audio!=null&&audio.length>0?audio[0]:null))
+                    .setOnCancelListener(d->callback.reject()).show();
+            }
+        });
+    }
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_SITE_PERMISSIONS && pendingAndroidPermissionCallback != null) {
+            boolean granted = grantResults.length > 0;
+            for (int result : grantResults) if (result != PackageManager.PERMISSION_GRANTED) granted = false;
+            if (granted) pendingAndroidPermissionCallback.grant(); else pendingAndroidPermissionCallback.reject();
+            pendingAndroidPermissionCallback = null;
+        }
     }
 
     private int dp(float value) { return (int)(value * getResources().getDisplayMetrics().density + 0.5f); }
@@ -169,11 +261,13 @@ public class MainActivity extends Activity {
         reload.setOnClickListener(v -> { if(current()!=null) current().session.reload(); });
         Button bookmark = button("☆", false); bookmark.setTextSize(19);
         bookmark.setOnClickListener(v -> saveBookmark());
+        Button shield = button("🛡", false); shield.setTextSize(17); shield.setOnClickListener(v -> setShieldEnabled(!shieldEnabled));
         bottom.addView(back, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(forward, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(home, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(reload, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(bookmark, new LinearLayout.LayoutParams(0, dp(44), 1));
+        bottom.addView(shield, new LinearLayout.LayoutParams(0, dp(44), 1));
         root.addView(bottom, new LinearLayout.LayoutParams(-1, dp(52)));
 
         status = label("Ready · Bolt Browser", 10, MUTED);
@@ -190,7 +284,14 @@ public class MainActivity extends Activity {
         tab.session = new GeckoSession();
         tab.view = new GeckoView(this);
         tab.session.open(runtime);
+        tab.session.getSettings().setUseTrackingProtection(shieldEnabled);
         tab.view.setSession(tab.session);
+        configureSitePermissionDelegate(tab.session);
+        tab.session.setContentBlockingDelegate(new ContentBlocking.Delegate() {
+            @Override public void onContentBlocked(GeckoSession blockedSession, ContentBlocking.BlockEvent event) {
+                runOnUiThread(() -> { blockedTrackers++; updateShieldLabel(); });
+            }
+        });
         tab.session.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override public GeckoResult<AllowOrDeny> onLoadRequest(GeckoSession session, LoadRequest request) {
                 String requested = request.uri == null ? "" : request.uri.trim();
@@ -323,6 +424,7 @@ public class MainActivity extends Activity {
         menu.getMenu().add("History").setOnMenuItemClickListener(item->{showSaved("history");return true;});
         menu.getMenu().add("Extensions").setOnMenuItemClickListener(item->{showExtensions();return true;});
         menu.getMenu().add("Install extension (.xpi)").setOnMenuItemClickListener(item->{pickExtension();return true;});
+        menu.getMenu().add((shieldEnabled ? "✓ " : "○ ") + "Ad & tracker shield · " + blockedTrackers).setOnMenuItemClickListener(item->{setShieldEnabled(!shieldEnabled);return true;});
         menu.getMenu().add("Settings").setOnMenuItemClickListener(item->{showSettings();return true;});
         menu.getMenu().add("Close current tab").setOnMenuItemClickListener(item->{closeCurrentTab();return true;});
         menu.getMenu().add("About Bolt").setOnMenuItemClickListener(item->{new AlertDialog.Builder(this).setTitle("Bolt Browser").setMessage("Android edition · GeckoView (Firefox engine)").setPositiveButton("OK",null).show();return true;});
@@ -410,11 +512,14 @@ public class MainActivity extends Activity {
     }
 
     private void showSettings() {
-        String[] options={"Clear browsing history","Clear bookmarks"};
+        String[] options={"Choose theme","Permission mode: " + (askSitePermissions()?"Ask / Allow":"Security-friendly defaults"),"Toggle ad & tracker shield","Clear browsing history","Clear bookmarks"};
         new AlertDialog.Builder(this).setTitle("Settings").setItems(options,(d,which)->{
-            if(which==0) getPreferences(MODE_PRIVATE).edit().remove("history").apply();
+            if(which==0) showThemePicker();
+            else if(which==1) new AlertDialog.Builder(this).setTitle("Website permissions").setMessage("Security-friendly defaults deny website requests. Ask / Allow displays a consent prompt for each site request.").setNegativeButton("Security-Friendly Defaults",(x,y)->mobilePrefs().edit().putString("permission_mode","secure").apply()).setPositiveButton("Ask / Allow",(x,y)->mobilePrefs().edit().putString("permission_mode","ask").apply()).show();
+            else if(which==2) setShieldEnabled(!shieldEnabled);
+            else if(which==3) getPreferences(MODE_PRIVATE).edit().remove("history").apply();
             else getPreferences(MODE_PRIVATE).edit().remove("bookmarks").apply();
-            Toast.makeText(this,"Done",Toast.LENGTH_SHORT).show();
+            if(which>=3) Toast.makeText(this,"Done",Toast.LENGTH_SHORT).show();
         }).setNegativeButton("Close",null).show();
     }
 
