@@ -166,7 +166,11 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       const after = { ...DEFAULTS, ...next };
       for (const [permission, toggle] of Object.entries(permissionToggle)) {
         if (before[toggle] && !after[toggle]) {
-          for (const key of [...grants]) if (key.endsWith('|' + permission) || (permission === 'media' && key.includes('|media:'))) grants.delete(key);
+          for (const key of [...grants]) {
+            if (key.endsWith('|' + permission) || (toggle === 'camera' && key.endsWith('|media:video')) || (toggle === 'microphone' && key.endsWith('|media:audio'))) grants.delete(key);
+          }
+          const deviceType = { usb: 'usb', serial: 'serial', hid: 'hid' }[toggle];
+          if (deviceType) for (const key of [...deviceGrants]) if (key.includes('|' + deviceType + '|')) deviceGrants.delete(key);
         }
       }
       return after;
