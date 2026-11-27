@@ -1,0 +1,54 @@
+name: Linux DEB package
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-deb:
+    name: Build Linux DEB (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build extension action preload
+        run: npm run build:preload
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check main.js
+          node --check preload.js
+          node --check preload.bundle.js
+          node --check permissions.js
+
+      - name: Build DEB package
+        run: npx electron-builder --linux deb --x64 --publish never
+
+      - name: Upload DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bolt-Browser-Linux-DEB-x86_64
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 30
