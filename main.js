@@ -17,6 +17,7 @@ let nextTabId = 1;
 let chromeHidden = false;
 let permissionManager;
 let permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS };
+let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; } catch (_) {} }
 function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings }, null, 2), 'utf8'); }
@@ -34,6 +35,16 @@ let extensionPaths = [];
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
+function handleExternalProtocol(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'bolt:' || !['newtab', 'extensions'].includes(parsed.hostname)) return false;
+    if (win && !win.isDestroyed()) createTab(rawUrl); else pendingProtocolUrl = rawUrl;
+    return true;
+  } catch (_) { return false; }
+}
+app.on('open-url', (event, url) => { event.preventDefault(); handleExternalProtocol(url); });
+
 function displayUrl(rawUrl) {
   const value = String(rawUrl || '');
   if (!value || value === 'about:blank') return '';
@@ -115,7 +126,7 @@ function createTab(url = 'bolt://newtab') {
     return { action: 'allow', overrideBrowserWindowOptions: { width, height, autoHideMenuBar: true, parent: win, backgroundColor: '#10131b', webPreferences: { session: browserSession(), contextIsolation: true, sandbox: true, nodeIntegration: false } } };
   });
   wc.on('enter-html-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
-  wc.on('leave-html-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
+  wc.on('leave-html-full-screen', () => { chromeHidden = Boolean(win?.isFullScreen()); layoutViews(); send('fullscreen-changed', chromeHidden); });
   wc.on('page-title-updated', publishTabs);
   wc.on('did-start-loading', publishTabs);
   wc.on('did-stop-loading', () => {
@@ -167,7 +178,10 @@ function createWindow() {
   win.on('enter-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
   win.on('leave-full-screen', () => { chromeHidden = false; layoutViews(); send('fullscreen-changed', false); });
   win.on('closed', () => { win = null; tabs.clear(); });
-  win.webContents.on('did-finish-load', () => createTab());
+  win.webContents.on('did-finish-load', () => {
+    createTab();
+    if (pendingProtocolUrl) { const url = pendingProtocolUrl; pendingProtocolUrl = null; handleExternalProtocol(url); }
+  });
 }
 
 function saveExtensionPaths() {
