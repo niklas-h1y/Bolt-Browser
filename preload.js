@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const { injectBrowserAction } = require('electron-chrome-extensions/browser-action');
-
 if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/index.html')) {
+  const { injectBrowserAction } = require('electron-chrome-extensions/browser-action');
   injectBrowserAction();
 }
 
