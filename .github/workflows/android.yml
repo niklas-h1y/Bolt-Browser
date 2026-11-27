@@ -1,4 +1,4 @@
-name: Android APK
+name: Android APK and Play Store Bundle
 on:
   workflow_dispatch:
   push:
@@ -33,4 +33,32 @@ jobs:
         with:
           name: bolt-browser-android-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Decode Play Store signing keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          chmod 600 app/release.keystore
+
+      - name: Build Play Store Android App Bundle
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          cleanup() {
+            rm -f app/release.keystore
+          }
+          trap cleanup EXIT
+          gradle bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bolt-browser-playstore-aab
+          path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
