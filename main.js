@@ -244,10 +244,11 @@ function createTab(url = 'bolt://newtab') {
       if (target.protocol !== 'about:') shell.openExternal(url).catch(() => {});
       return { action: 'deny' };
     }
-    const popupFeatures = Object.fromEntries(String(features || '').split(',').map(part => part.trim().split('=').map(v => v.trim())).filter(pair => pair.length === 2));
-    const width = Math.max(360, Math.min(1200, Number(popupFeatures.width) || 900));
-    const height = Math.max(300, Math.min(1000, Number(popupFeatures.height) || 700));
-    return { action: 'allow', overrideBrowserWindowOptions: { width, height, autoHideMenuBar: true, parent: win, backgroundColor: '#10131b', webPreferences: { session: browserSession(), contextIsolation: true, sandbox: true, nodeIntegration: false } } };
+    // Keep web popups inside Bolt's managed tab system. Creating an unmanaged
+    // BrowserWindow here can detach Web Store auth/navigation from the tab
+    // lifecycle and has caused the app window to become unstable.
+    createTab(url);
+    return { action: 'deny' };
   });
   wc.on('enter-html-full-screen', () => { chromeHidden = true; layoutViews(); send('fullscreen-changed', true); });
   wc.on('leave-html-full-screen', () => { chromeHidden = Boolean(win?.isFullScreen()); layoutViews(); send('fullscreen-changed', chromeHidden); });
