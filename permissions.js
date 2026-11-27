@@ -44,12 +44,12 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       : await dialog.showMessageBox(options);
     return result.response;
   }
-  async function chooseDevice(title, devices, type) {
+  async function chooseDevice(title, devices, type, origin = 'This website') {
     if (!devices?.length) return null;
     const visible = devices.slice(0, 12);
     const labels = visible.map(d => deviceLabel(d, type));
     const buttons = [...labels, 'Cancel'];
-    const choice = await ask(title, 'Choose a device to share with this website.', buttons);
+    const choice = await ask(title, origin + ' wants to connect to a ' + type + ' device. Choose which device to allow.', buttons);
     return choice < visible.length ? visible[choice] : null;
   }
 
@@ -115,7 +115,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
     const origin = safeOrigin(details.frame?.url || '');
     if (!enabled('usb') || !origin) return callback();
     try {
-      const device = await chooseDevice('Select USB device', details.deviceList, 'usb');
+      const device = await chooseDevice('Select USB device', details.deviceList, 'usb', origin);
       if (!device) return callback();
       deviceGrants.add(deviceKey(origin, 'usb', device));
       callback(device.deviceId);
@@ -127,7 +127,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
     const origin = safeOrigin(details.frame?.url || '');
     if (!enabled('hid') || !origin) return callback();
     try {
-      const device = await chooseDevice('Select HID device', details.deviceList, 'hid');
+      const device = await chooseDevice('Select HID device', details.deviceList, 'hid', origin);
       if (!device) return callback();
       deviceGrants.add(deviceKey(origin, 'hid', device));
       callback(device.deviceId);
@@ -139,7 +139,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
     const origin = safeOrigin(webContents?.getURL());
     if (!enabled('serial') || !origin) return callback('');
     try {
-      const port = await chooseDevice('Select serial port', portList, 'serial');
+      const port = await chooseDevice('Select serial port', portList, 'serial', origin);
       if (!port) return callback('');
       deviceGrants.add(deviceKey(origin, 'serial', port));
       callback(port.portId);
@@ -153,7 +153,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false
       });
-      const selected = await chooseDevice('Choose what to share', sources, 'screen/window');
+      const selected = await chooseDevice('Choose what to share', sources, 'screen/window', origin);
       if (!selected) return callback(null);
       callback({ video: selected, ...(request.audioRequested && process.platform === 'win32' ? { audio: 'loopback' } : {}) });
     } catch (error) { console.error('Screen capture source selection failed:', error); callback(null); }
@@ -183,7 +183,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
         // Electron may emit this event before scanning has discovered any devices. Leave the callback pending so a later event can supply the updated list.
         if (!deviceList?.length) return;
         try {
-          const device = await chooseDevice('Select Bluetooth device', deviceList, 'bluetooth');
+          const device = await chooseDevice('Select Bluetooth device', deviceList, 'bluetooth', origin);
           callback(device?.deviceId || '');
         } catch (error) { console.error(error); callback(''); }
       });
