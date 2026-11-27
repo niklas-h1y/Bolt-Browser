@@ -38,7 +38,7 @@ function activate(id) {
   publishTabs();
 }
 function isExtensionsUrl(value) {
-  return /^\\s*(?:chrome|bolt):\\/\\/extensions\\/?(?:[?#].*)?\\s*$/i.test(String(value || ''));
+  return /^\s*(?:chrome|bolt):\/\/extensions\/?(?:[?#].*)?\s*$/i.test(String(value || ''));
 }
 function openExtensionsPage(webContents) {
   if (!webContents || webContents.isDestroyed()) return;
@@ -49,7 +49,7 @@ function navigateTo(input) {
   if (!value) return '';
   if (isExtensionsUrl(value)) return 'bolt://extensions';
   if (/^(https?:|file:|about:)/i.test(value)) return value;
-  if (/^[\\w-]+(\\.[\\w-]+)+(:\\d+)?(\\/.*)?$/.test(value) || /^localhost(:\\d+)?/.test(value)) return 'https://' + value;
+  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value) || /^localhost(:\d+)?/.test(value)) return 'https://' + value;
   return 'https://www.google.com/search?q=' + encodeURIComponent(value);
 }
 function createTab(url = 'bolt://newtab') {
