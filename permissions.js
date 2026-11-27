@@ -167,12 +167,14 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       for (const [permission, toggle] of Object.entries(permissionToggle)) {
         if (before[toggle] && !after[toggle]) {
           for (const key of [...grants]) {
-            if (key.endsWith('|' + permission) || (toggle === 'camera' && key.endsWith('|media:video')) || (toggle === 'microphone' && key.endsWith('|media:audio'))) grants.delete(key);
+            if (key.endsWith('|' + permission)) grants.delete(key);
           }
           const deviceType = { usb: 'usb', serial: 'serial', hid: 'hid' }[toggle];
           if (deviceType) for (const key of [...deviceGrants]) if (key.includes('|' + deviceType + '|')) deviceGrants.delete(key);
         }
       }
+      if (before.camera && !after.camera) for (const key of [...grants]) if (key.endsWith('|media:video')) grants.delete(key);
+      if (before.microphone && !after.microphone) for (const key of [...grants]) if (key.endsWith('|media:audio')) grants.delete(key);
       return after;
     },
     attachWebContents(webContents) {
