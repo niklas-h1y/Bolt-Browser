@@ -76,12 +76,12 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       const origin = safeOrigin(details.securityOrigin || details.requestingUrl || webContents?.getURL());
       if (!origin) return done(false);
       if (permission === 'media') {
-        const types = Array.isArray(details.mediaTypes) ? details.mediaTypes : [];
+        const types = Array.isArray(details.mediaTypes) ? details.mediaTypes : (details.mediaType && details.mediaType !== 'unknown' ? [details.mediaType] : []);
         const wantsVideo = types.includes('video');
         const wantsAudio = types.includes('audio');
         if ((wantsVideo && !enabled('camera')) || (wantsAudio && !enabled('microphone')) || (!wantsVideo && !wantsAudio)) return done(false);
         const kinds = [wantsVideo && 'camera', wantsAudio && 'microphone'].filter(Boolean).join(' and ');
-        const response = await ask('Allow camera and microphone?', origin + ' wants to use your ' + kinds + '.');
+        const response = await ask('Allow ' + kinds + '?', origin + ' wants to use your ' + kinds + '.');
         if (response === 0) { if (wantsVideo) grant(origin, 'media:video'); if (wantsAudio) grant(origin, 'media:audio'); done(true); }
         else done(false);
         return;
