@@ -71,9 +71,9 @@ let extensionPaths = [];
 
 function cleanChromeUserAgent(userAgent) {
   return String(userAgent || '')
-    .replace(/\\s*Electron\\/[\\d.]+/gi, '')
-    .replace(/\\s*Bolt[\\w-]*\\/[\\d.]+/gi, '')
-    .replace(/\\s{2,}/g, ' ')
+    .replace(/\s*Electron\/[\d.]+/gi, '')
+    .replace(/\s*Bolt[\w-]*\/[\d.]+/gi, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 function showWebStoreInstallToast(webContents, message) {
