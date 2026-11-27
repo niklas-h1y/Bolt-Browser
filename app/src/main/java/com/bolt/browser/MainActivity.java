@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
     private FrameLayout webHost;
     private EditText address;
     private TextView status;
+    private Button shieldButton;
     private final ArrayList<Tab> tabs = new ArrayList<>();
     private int active = -1;
     private int blockedTrackers = 0;
@@ -109,6 +110,7 @@ public class MainActivity extends Activity {
     }
     private void updateShieldLabel() {
         if (status != null) status.setText((shieldEnabled ? "Shield on" : "Shield off") + " · " + blockedTrackers + " trackers blocked");
+        if (shieldButton != null) shieldButton.setText("🛡 " + blockedTrackers);
     }
     private void setShieldEnabled(boolean enabled) {
         shieldEnabled = enabled; mobilePrefs().edit().putBoolean("shield_enabled", enabled).apply();
@@ -261,13 +263,13 @@ public class MainActivity extends Activity {
         reload.setOnClickListener(v -> { if(current()!=null) current().session.reload(); });
         Button bookmark = button("☆", false); bookmark.setTextSize(19);
         bookmark.setOnClickListener(v -> saveBookmark());
-        Button shield = button("🛡", false); shield.setTextSize(17); shield.setOnClickListener(v -> setShieldEnabled(!shieldEnabled));
+        shieldButton = button("🛡 0", false); shieldButton.setTextSize(12); shieldButton.setOnClickListener(v -> setShieldEnabled(!shieldEnabled));
         bottom.addView(back, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(forward, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(home, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(reload, new LinearLayout.LayoutParams(0, dp(44), 1));
         bottom.addView(bookmark, new LinearLayout.LayoutParams(0, dp(44), 1));
-        bottom.addView(shield, new LinearLayout.LayoutParams(0, dp(44), 1));
+        bottom.addView(shieldButton, new LinearLayout.LayoutParams(0, dp(44), 1));
         root.addView(bottom, new LinearLayout.LayoutParams(-1, dp(52)));
 
         status = label("Ready · Bolt Browser", 10, MUTED);
