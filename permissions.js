@@ -3,7 +3,7 @@ const { dialog, desktopCapturer } = require('electron');
 const DEFAULTS = {
   camera: true, microphone: true, screenShare: true, geolocation: true,
   bluetooth: true, usb: true, serial: true, hid: true,
-  clipboardRead: false, clipboardWrite: true, webxr: true, nfc: true, sensors: true, pointerLock: true, keyboardLock: true, notifications: true, midi: true, midiSysex: true, localFonts: true, windowManagement: true, drm: true
+  clipboardRead: false, clipboardWrite: true, webxr: true, nfc: true, sensors: true, pointerLock: true, keyboardLock: true, fullscreen: true, notifications: true, midi: true, midiSysex: true, localFonts: true, windowManagement: true, drm: true
 };
 
 const permissionToggle = {
@@ -11,7 +11,7 @@ const permissionToggle = {
   'display-capture': 'screenShare', bluetooth: 'bluetooth', usb: 'usb',
   serial: 'serial', hid: 'hid', 'clipboard-read': 'clipboardRead',
   'clipboard-sanitized-write': 'clipboardWrite', vr: 'webxr', ar: 'webxr',
-  'hand-tracking': 'webxr', 'camera-pan-tilt-zoom': 'camera', nfc: 'nfc', accelerometer: 'sensors', gyroscope: 'sensors', magnetometer: 'sensors', pointerLock: 'pointerLock', keyboardLock: 'keyboardLock', notifications: 'notifications', midi: 'midi', midiSysex: 'midiSysex', 'local-fonts': 'localFonts', 'window-management': 'windowManagement', mediaKeySystem: 'drm'
+  'hand-tracking': 'webxr', 'camera-pan-tilt-zoom': 'camera', nfc: 'nfc', accelerometer: 'sensors', gyroscope: 'sensors', magnetometer: 'sensors', pointerLock: 'pointerLock', keyboardLock: 'keyboardLock', fullscreen: 'fullscreen', 'automatic-fullscreen': 'fullscreen', notifications: 'notifications', midi: 'midi', midiSysex: 'midiSysex', 'local-fonts': 'localFonts', 'window-management': 'windowManagement', mediaKeySystem: 'drm'
 };
 
 function safeOrigin(value) {
@@ -89,7 +89,7 @@ function configurePermissions({ ses, getWindow, getSettings }) {
       const toggle = permissionToggle[permission];
       if (!toggle || !enabled(toggle)) return done(false);
       const names = {
-        geolocation: 'location', 'geolocation-approximate': 'approximate location', nfc: 'NFC', accelerometer: 'motion sensors', gyroscope: 'motion sensors', magnetometer: 'motion sensors', pointerLock: 'pointer lock', keyboardLock: 'keyboard lock', notifications: 'desktop notifications', midi: 'MIDI', midiSysex: 'MIDI system-exclusive access', 'local-fonts': 'local font access', 'window-management': 'screen enumeration', mediaKeySystem: 'protected media playback (DRM)',
+        geolocation: 'location', 'geolocation-approximate': 'approximate location', nfc: 'NFC', accelerometer: 'motion sensors', gyroscope: 'motion sensors', magnetometer: 'motion sensors', pointerLock: 'pointer lock', keyboardLock: 'keyboard lock', fullscreen: 'fullscreen', 'automatic-fullscreen': 'automatic fullscreen', notifications: 'desktop notifications', midi: 'MIDI', midiSysex: 'MIDI system-exclusive access', 'local-fonts': 'local font access', 'window-management': 'screen enumeration', mediaKeySystem: 'protected media playback (DRM)',
         'display-capture': 'screen sharing', 'clipboard-read': 'read clipboard',
         'clipboard-sanitized-write': 'write to clipboard', vr: 'VR access', ar: 'AR access',
         'hand-tracking': 'hand tracking', 'camera-pan-tilt-zoom': 'camera pan, tilt and zoom'
