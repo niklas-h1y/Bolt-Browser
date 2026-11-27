@@ -17,6 +17,8 @@ if (process.env.BOLT_GOOGLE_API_KEY && !process.env.GOOGLE_API_KEY) process.env.
 let win;
 let tabs = new Map();
 let activeTabId = null;
+let workspaces = ['Personal'];
+let activeWorkspace = 'Personal';
 let overlayOpen = false;
 let extensionPopupWindows = new Map();
 let nextTabId = 1;
@@ -35,8 +37,8 @@ let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 const sessionPath = () => path.join(app.getPath('userData'), 'session.json');
-function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; } catch (_) {} }
-function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, siteOverrides, shieldEnabled, uiSettings }, null, 2), 'utf8'); }
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; workspaces = Array.isArray(saved.workspaces) ? [...new Set(saved.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal']; if (!workspaces.length) workspaces = ['Personal']; activeWorkspace = workspaces.includes(saved.activeWorkspace) ? saved.activeWorkspace : workspaces[0]; } catch (_) {} }
+function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, siteOverrides, shieldEnabled, uiSettings, workspaces, activeWorkspace }, null, 2), 'utf8'); }
 function isChromeWebStoreRequest(details) {
   try {
     const requestUrl = new URL(details.url);
@@ -198,7 +200,8 @@ function saveSessionNow() {
   try {
     const entries = [...tabs.entries()].map(([id, item]) => ({
       url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab',
-      group: typeof item.group === 'string' ? item.group.slice(0, 24) : ''
+      group: typeof item.group === 'string' ? item.group.slice(0, 24) : '',
+      workspace: item.workspace || 'Personal'
     }));
     const activeIndex = Math.max(0, [...tabs.keys()].indexOf(activeTabId));
     fs.mkdirSync(path.dirname(sessionPath()), { recursive: true });
@@ -228,22 +231,26 @@ function restoreSession() {
           || (parsed.protocol === 'bolt:' && ['newtab', 'extensions'].includes(parsed.hostname));
       } catch (_) {}
       if (!valid) url = 'bolt://newtab';
+      const entryWorkspace = typeof entry.workspace === 'string' && /^[\\w -]{1,24}$/.test(entry.workspace) ? entry.workspace : 'Personal';
+      if (!workspaces.includes(entryWorkspace) && workspaces.length < 12) workspaces.push(entryWorkspace);
       const id = createTab(url);
       const item = tabs.get(id);
       if (item && typeof entry.group === 'string') item.group = entry.group.slice(0, 24);
+      if (item) item.workspace = entryWorkspace;
       restoredIds.push(id);
     }
     const index = Number.isInteger(saved.activeIndex) ? Math.min(Math.max(saved.activeIndex, 0), restoredIds.length - 1) : 0;
+    activeWorkspace = tabs.get(restoredIds[index])?.workspace || activeWorkspace;
     activate(restoredIds[index]);
   } finally { isRestoringSession = false; }
   publishTabs();
   scheduleSessionSave();
 }
 function snapshot() {
-  return [...tabs.entries()].map(([id, item]) => ({
+  return [...tabs.entries()].filter(([, item]) => (item.workspace || 'Personal') === activeWorkspace).map(([id, item]) => ({
     id, url: displayUrl(item.view.webContents.getURL()), title: item.view.webContents.getTitle() || 'New tab',
     loading: item.view.webContents.isLoading(), active: id === activeTabId,
-    group: typeof item.group === 'string' ? item.group : ''
+    group: typeof item.group === 'string' ? item.group : '', workspace: item.workspace || 'Personal'
   }));
 }
 function publishTabs() { send('tabs-updated', snapshot()); scheduleSessionSave(); }
@@ -253,13 +260,14 @@ function layoutViews() {
   for (const [id, item] of tabs) {
     const top = chromeHidden ? 0 : 116;
     item.view.setBounds({ x: 0, y: top, width, height: Math.max(100, height - top - (chromeHidden ? 0 : 24)) });
-    item.view.setVisible(id === activeTabId && !overlayOpen);
+    item.view.setVisible(id === activeTabId && (item.workspace || 'Personal') === activeWorkspace && !overlayOpen);
   }
 }
 function activate(id) {
   if (!tabs.has(id)) return;
   activeTabId = id;
   layoutViews();
+  activeWorkspace = tabs.get(id).workspace || activeWorkspace;
   const wc = tabs.get(id).view.webContents;
   if (extensionManager) extensionManager.selectTab(wc);
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
@@ -305,7 +313,7 @@ function createTab(url = 'bolt://newtab') {
     }
   });
   win.contentView.addChildView(view);
-  tabs.set(id, { view, group: '' });
+  tabs.set(id, { view, group: '', workspace: activeWorkspace });
   const wc = view.webContents;
   if (extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
   // Keep the session and each embedded page on the same Chrome-like UA.
@@ -399,7 +407,7 @@ function closeTab(id, fromExtension = false) {
   win?.contentView.removeChildView(item.view);
   if (!item.view.webContents.isDestroyed()) item.view.webContents.close();
   if (activeTabId === id) {
-    const next = [...tabs.keys()].at(-1);
+    const next = [...tabs.entries()].filter(([, tab]) => (tab.workspace || 'Personal') === activeWorkspace).map(([tabId]) => tabId).at(-1);
     if (next) activate(next); else createTab();
   } else publishTabs();
   scheduleSessionSave();
@@ -579,6 +587,33 @@ ipcMain.handle('tab:overlay', (_e, isOpen) => {
 });
 ipcMain.handle('tab:new', (_e, url) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return createTab(url || 'bolt://newtab'); });
 ipcMain.handle('tab:activate', (_e, id) => { if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.'); return activate(Number(id)); });
+ipcMain.handle('workspace:list', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  return { workspaces: [...workspaces], active: activeWorkspace };
+});
+ipcMain.handle('workspace:create', (event, name) => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  if (typeof name !== 'string' || !/^[\\w -]{1,24}$/.test(name.trim())) throw new Error('Workspace names must be 1–24 letters, numbers, spaces, _ or -.');
+  const clean = name.trim();
+  if (workspaces.includes(clean)) { activeWorkspace = clean; } else {
+    if (workspaces.length >= 12) throw new Error('You can create up to 12 workspaces.');
+    workspaces.push(clean); activeWorkspace = clean;
+  }
+  saveSettings();
+  const existing = [...tabs.entries()].find(([, item]) => (item.workspace || 'Personal') === activeWorkspace)?.[0];
+  if (existing) activate(existing); else createTab();
+  send('workspaces-updated', { workspaces: [...workspaces], active: activeWorkspace });
+  return { workspaces: [...workspaces], active: activeWorkspace };
+});
+ipcMain.handle('workspace:switch', (event, name) => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  if (typeof name !== 'string' || !workspaces.includes(name)) throw new Error('Workspace not found.');
+  activeWorkspace = name;
+  const existing = [...tabs.entries()].find(([, item]) => (item.workspace || 'Personal') === name)?.[0];
+  if (existing) activate(existing); else createTab();
+  send('workspaces-updated', { workspaces: [...workspaces], active: activeWorkspace });
+  return { workspaces: [...workspaces], active: activeWorkspace };
+});
 ipcMain.handle('tab:set-group', (_e, id, group) => {
   if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.');
   const item = tabs.get(Number(id));
@@ -640,7 +675,8 @@ ipcMain.handle('backup:export', async event => {
     uiSettings: { ...uiSettings, newTabBackgroundImage: '' },
     permissions: { ...permissionSettings },
     shieldEnabled,
-    tabs: [...tabs.values()].map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '' })),
+    tabs: [...tabs.values()].map(item => ({ url: sessionSafeUrl(item.view.webContents) || 'bolt://newtab', group: item.group || '', workspace: item.workspace || 'Personal' })),
+    workspaces: [...workspaces], activeWorkspace,
     activeIndex: Math.max(0, [...tabs.keys()].indexOf(activeTabId))
   };
   fs.writeFileSync(result.filePath, JSON.stringify(backup, null, 2), { encoding: 'utf8', mode: 0o600 });
@@ -674,10 +710,14 @@ ipcMain.handle('backup:import', async event => {
   }
   shieldEnabled = backup.shieldEnabled !== false;
   configureShield(browserSession());
+  workspaces = Array.isArray(backup.workspaces) ? [...new Set(backup.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal'];
+  if (!workspaces.length) workspaces = ['Personal'];
+  activeWorkspace = workspaces.includes(backup.activeWorkspace) ? backup.activeWorkspace : workspaces[0];
   const incomingTabs = Array.isArray(backup.tabs) ? backup.tabs.slice(0, 50).map(entry => {
     let url = typeof entry?.url === 'string' ? entry.url : 'bolt://newtab';
     try { const parsed = new URL(url); if (!(['http:', 'https:'].includes(parsed.protocol) || (parsed.protocol === 'bolt:' && ['newtab','extensions'].includes(parsed.hostname)))) url = 'bolt://newtab'; } catch (_) { url = 'bolt://newtab'; }
-    return { url, group: typeof entry?.group === 'string' ? entry.group.slice(0, 24) : '' };
+    const workspace = typeof entry?.workspace === 'string' && workspaces.includes(entry.workspace) ? entry.workspace : 'Personal';
+    return { url, group: typeof entry?.group === 'string' ? entry.group.slice(0, 24) : '', workspace };
   }) : [];
   saveSettings();
   if (uiSettings.restoreSession) {
