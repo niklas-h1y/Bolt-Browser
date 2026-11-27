@@ -64,3 +64,16 @@ ECS currently documents limitations around persistent licenses; check the select
 - Test device request and cancellation paths for each USB/HID/serial/Bluetooth device class.
 - Test multiple simultaneous downloads, OAuth popup sign-in, delayed `window.open`, HTML video fullscreen, pointer lock, keyboard lock, and clipboard prompts on each target OS.
 - This code is an Electron integration layer, not a guarantee that every listed API is implemented by the bundled Chromium version or supported by every OS/device.
+
+
+## Ad and tracker shield
+
+Desktop Bolt enables its request shield by default. The 🛡 toolbar button toggles blocking and displays the number of blocked requests. The filter blocks common ad networks and analytics/tracking endpoints (including DoubleClick, Google advertising/analytics, AppNexus, Taboola, Outbrain, ScorecardResearch, and others). The setting is stored in the app's user-data `settings.json`.
+
+Android uses GeckoView's Enhanced Tracking Protection in strict mode with per-session tracking protection enabled by the shield toggle. The bottom toolbar/menu displays the blocked tracker count. This is GeckoView's built-in content blocking, not a separate third-party ad-list engine.
+
+## Themes and Android first-run permissions
+
+Desktop theme settings are shared through the app's persisted UI preferences and applied to the browser chrome, new-tab page, and extensions manager. Presets are Bolt Dark, Midnight Neon, OLED Pitch Black, and Clean Light, with a custom accent color.
+
+Android stores its theme and first-run permission choice in `SharedPreferences`. The first-run dialog offers Security-Friendly Defaults (deny website permission requests) or Ask / Allow Permissions (show per-request consent dialogs). The choice is enforced by each GeckoSession's PermissionDelegate. Android supports the same four theme presets in its native browser chrome and GeckoView start page.
