@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Tab recovered · Bolt Browser</title>
+<style>
+:root{color-scheme:dark;--bg:#111210;--panel:#191b18;--line:#30342d;--text:#f2f4ed;--muted:#92988c;--accent:#b8f36b;--ink:#17200d}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 20%,#b8f36b12,transparent 55%),var(--bg);color:var(--text);font:15px/1.6 Inter,system-ui,-apple-system,sans-serif}
+main{width:min(560px,100%);padding:36px;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:0 24px 80px #0005;text-align:center}.mark{width:44px;height:44px;margin:0 auto 20px;display:grid;place-items:center;border-radius:14px;background:var(--accent);color:var(--ink);font-size:27px}h1{font-size:25px;letter-spacing:-.7px;margin:0 0 10px}p{color:var(--muted);margin:0 auto 24px;max-width:44ch}.actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}.button{border:1px solid var(--line);border-radius:10px;padding:11px 16px;background:#222520;color:var(--text);font:inherit;font-weight:650;cursor:pointer}.button.primary{background:var(--accent);border-color:var(--accent);color:var(--ink)}.button:disabled{opacity:.55;cursor:wait}.status{min-height:22px;margin-top:16px;color:var(--muted);font-size:12px}
+</style></head>
+<body><main><div class="mark">ϟ</div><h1>This tab stopped unexpectedly</h1><p>The page’s renderer process closed before it could finish. Your other tabs are still available. You can try reloading this page or return to a new tab.</p><div class="actions"><button class="button primary" id="recover">Reload page</button><button class="button" id="home">Open new tab</button></div><div class="status" id="status" role="status"></div></main>
+<script>
+const status=document.getElementById('status'),recover=document.getElementById('recover');
+recover.addEventListener('click',async()=>{recover.disabled=true;status.textContent='Reloading…';try{await window.bolt.recoverTab()}catch(error){status.textContent='Could not reload this page: '+error.message;recover.disabled=false}});
+document.getElementById('home').addEventListener('click',()=>window.bolt.navigate('bolt://newtab'));
+</script></body></html>
