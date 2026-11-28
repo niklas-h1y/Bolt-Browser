@@ -45,6 +45,7 @@
       "newtab.html",
       "extensions.html",
       "internal.html",
+      "crash.html",
       "icon.svg",
       "extensions/**/*",
       "permissions.js",
