@@ -341,6 +341,8 @@ function openExtensionsPage(webContents) { loadInternalPage(webContents, 'extens
 function navigateTo(input) {
   const value = String(input || '').trim();
   if (!value) return '';
+  // The official Chrome Web Store is a normal HTTPS destination, never an internal/blocked URL.
+  if (/^https:\/\/chromewebstore\.google\.com\//i.test(value)) return value;
   const internalPage = internalPageForUrl(value);
   if (internalPage === 'extensions') return 'bolt://extensions';
   if (internalPage === 'newtab') return 'bolt://newtab';
@@ -682,17 +684,32 @@ ipcMain.handle('workspace:list', event => {
 });
 ipcMain.handle('workspace:create', (event, name) => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
-  if (typeof name !== 'string' || !/^[\w -]{1,24}$/.test(name.trim())) throw new Error('Workspace names must be 1–24 letters, numbers, spaces, _ or -.');
+  if (typeof name !== 'string') throw new Error('Workspace name must be text.');
   const clean = name.trim();
-  if (workspaces.includes(clean)) { activeWorkspace = clean; } else {
+  if (!/^[\w -]{1,24}$/.test(clean)) throw new Error('Workspace names must be 1–24 letters, numbers, spaces, _ or -.');
+  const previousWorkspaces = [...workspaces];
+  const previousWorkspace = activeWorkspace;
+  if (!workspaces.includes(clean)) {
     if (workspaces.length >= 12) throw new Error('You can create up to 12 workspaces.');
-    workspaces.push(clean); activeWorkspace = clean;
+    workspaces.push(clean);
   }
-  saveSettings();
-  const existing = [...tabs.entries()].find(([, item]) => (item.workspace || 'Personal') === activeWorkspace)?.[0];
-  if (existing) activate(existing); else createTab();
-  send('workspaces-updated', { workspaces: [...workspaces], active: activeWorkspace });
-  return { workspaces: [...workspaces], active: activeWorkspace };
+  activeWorkspace = clean;
+  try {
+    // Initialize the isolated session before attaching a new view to the window.
+    workspaceSession(clean);
+    const existing = [...tabs.entries()].find(([, item]) => (item.workspace || 'Personal') === clean)?.[0];
+    if (existing) activate(existing);
+    else createTab('bolt://newtab', { workspace: clean });
+    saveSettings();
+    const result = { workspaces: [...workspaces], active: activeWorkspace };
+    send('workspaces-updated', result);
+    return result;
+  } catch (error) {
+    workspaces = previousWorkspaces;
+    activeWorkspace = previousWorkspace;
+    try { saveSettings(); } catch (_) {}
+    throw new Error('Could not create workspace: ' + error.message);
+  }
 });
 ipcMain.handle('workspace:switch', (event, name) => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
