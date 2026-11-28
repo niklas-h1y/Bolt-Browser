@@ -1115,7 +1115,7 @@ app.whenReady().then(async () => {
   });
   // The extension-action protocol returns HTTP 400 when an action has no usable icon.
   // Keep the toolbar quiet by supplying Bolt's own icon only for those missing-icon responses.
-  const fallbackExtensionIcon = nativeImage.createFromPath(path.join(__dirname, 'icon.svg')).toPNG();
+  const fallbackExtensionIcon = nativeImage.createFromPath(path.join(__dirname, 'icon-192.png')).toPNG();
   const browserActionApi = extensionManager.api?.browserAction;
   if (browserActionApi && typeof browserActionApi.handleCRXRequest === 'function' && fallbackExtensionIcon.length) {
     const handleCRXRequest = browserActionApi.handleCRXRequest.bind(browserActionApi);
