@@ -89,6 +89,7 @@ if (window.location.protocol === 'file:' && window.location.pathname.endsWith('/
     back: () => invoke('tab:back'),
     forward: () => invoke('tab:forward'),
     reload: () => invoke('tab:reload'),
+    recoverTab: () => invoke('tab:recover'),
     home: () => invoke('tab:home'),
     listExtensions: () => invoke('extensions:list'),
     installExtension: () => invoke('extensions:install'),
