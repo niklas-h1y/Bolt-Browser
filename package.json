@@ -47,6 +47,7 @@
       "internal.html",
       "crash.html",
       "icon.svg",
+      "icon-192.png",
       "extensions/**/*",
       "permissions.js",
       "preload.bundle.js"
