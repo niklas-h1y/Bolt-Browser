@@ -2,7 +2,7 @@
 [Download Android APK](https://github.com/niklas-h1y/Bolt-Browser/releases/download/v0.1-debug/Bolt_Browser.apk)
 Bolt Browser has a desktop Electron browser, an Android browser, and a lightweight hosted start page.
 
-- **Desktop:** Electron + Chromium, tabs, downloads and Manifest V3 extension loading.
+- **Desktop:** Electron + Chromium, tabs, downloads, workspaces, reader mode, browsing history, privacy tools and Manifest V3 extension loading. Built-in pages include `bolt://history`, `bolt://privacy`, `bolt://help` and `bolt://quit`.
 - **Android:** native browser chrome powered by Mozilla GeckoView (the Firefox engine), with tabs, navigation, bookmarks, history and GeckoView WebExtensions.
 - **Hosted start page:** lightweight PWA in `mobile/`.
 
