@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, WebContentsView, Menu, ipcMain, dialog, session, shell, protocol, net, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL, fileURLToPath } = require('node:url');
@@ -198,6 +198,7 @@ function displayUrl(rawUrl) {
       if (page === 'newtab.html') return '';
       if (page === 'extensions.html') return 'bolt://extensions';
       if (page === 'internal.html') return 'bolt://' + (new URL(value).searchParams.get('page') || 'help');
+      if (page === 'crash.html') return 'Page crashed';
     }
   } catch (_) {}
   return value;
@@ -370,7 +371,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
     }
   });
   win.contentView.addChildView(view);
-  const item = { view, group: '', workspace: tabWorkspace, incognito, tabSession };
+  const item = { view, group: '', workspace: tabWorkspace, incognito, tabSession, lastUrl: /^https?:\\/\\//i.test(String(url)) ? String(url) : '', crashedUrl: null, crashPage: false };
   if (incognito) item.permissionManager = configurePermissions({ ses: tabSession, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
   else item.permissionManager = workspacePermissionManagers.get(workspacePartition(activeWorkspace)) || permissionManager;
   tabs.set(id, item);
@@ -435,6 +436,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
   });
   wc.on('did-navigate', (_event, navigatedUrl) => {
     item.readerCssKey = null;
+    if (/^https?:\\/\\//i.test(String(navigatedUrl))) { item.lastUrl = navigatedUrl; item.crashPage = false; }
     recordHistory(item, navigatedUrl);
     if (id === activeTabId) send('reader-state', false);
     if (id === activeTabId) send('page-state', { id, url: displayUrl(navigatedUrl), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
@@ -452,7 +454,14 @@ function createTab(url = 'bolt://newtab', options = {}) {
   wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (isMainFrame && errorCode !== -3 && id === activeTabId) send('browser-error', { id, message: `Could not load ${validatedURL}: ${errorDescription} (${errorCode})` });
   });
-  wc.on('render-process-gone', (_event, details) => send('browser-error', { id, message: 'A page process stopped: ' + details.reason }));
+  wc.on('render-process-gone', (_event, details) => {
+    if (item.crashPage || wc.isDestroyed()) return;
+    const currentUrl = wc.getURL();
+    item.crashedUrl = /^https?:\\/\\//i.test(currentUrl) ? currentUrl : item.lastUrl;
+    item.crashPage = true;
+    send('browser-error', { id, message: 'This tab stopped unexpectedly (' + details.reason + ').' });
+    wc.loadFile(path.join(__dirname, 'crash.html')).catch(error => console.error('Could not show tab recovery page:', error));
+  });
   activate(id);
   if (url === 'bolt://newtab' || internalPageForUrl(url) === 'newtab') {
     const override = extensionManager?.getURLOverrides().newtab;
@@ -631,7 +640,7 @@ function isAppUiSender(event) {
     if (!event?.sender || !event?.senderFrame || event.senderFrame !== event.sender.mainFrame) return false;
     const senderUrl = new URL(event.senderFrame.url);
     if (senderUrl.protocol !== 'file:' || senderUrl.hash) return false;
-    const allowedFiles = new Set(['index.html', 'newtab.html', 'extensions.html', 'internal.html']);
+    const allowedFiles = new Set(['index.html', 'newtab.html', 'extensions.html', 'internal.html', 'crash.html']);
     const senderFile = path.basename(decodeURIComponent(senderUrl.pathname)).toLowerCase();
     if (senderUrl.search && (senderFile !== 'internal.html' || !['history', 'privacy', 'help'].includes(senderUrl.searchParams.get('page')))) return false;
     const cleanSenderUrl = new URL(senderUrl.href); cleanSenderUrl.search = '';
@@ -718,6 +727,16 @@ ipcMain.handle('tab:navigate', (_e, input) => {
 ipcMain.handle('tab:back', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
 ipcMain.handle('tab:forward', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); });
 ipcMain.handle('tab:reload', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return tabs.get(activeTabId)?.view.webContents.reload(); });
+ipcMain.handle('tab:recover', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const item = [...tabs.values()].find(entry => entry.view.webContents === event.sender);
+  if (!item || !item.crashedUrl || !/^https?:\\/\\//i.test(item.crashedUrl)) throw new Error('There is no crashed web page to recover.');
+  const target = item.crashedUrl;
+  item.crashedUrl = null;
+  item.crashPage = false;
+  return item.view.webContents.loadURL(target);
+});
+
 ipcMain.handle('tab:home', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return shell.openPath(app.getPath('downloads')); });
 ipcMain.handle('app:quit', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); app.quit(); return true; });
@@ -1094,6 +1113,24 @@ app.whenReady().then(async () => {
       return result.response === 1;
     }
   });
+  // The extension-action protocol returns HTTP 400 when an action has no usable icon.
+  // Keep the toolbar quiet by supplying Bolt's own icon only for those missing-icon responses.
+  const fallbackExtensionIcon = nativeImage.createFromPath(path.join(__dirname, 'icon.svg')).toPNG();
+  const browserActionApi = extensionManager.api?.browserAction;
+  if (browserActionApi && typeof browserActionApi.handleCRXRequest === 'function' && fallbackExtensionIcon.length) {
+    const handleCRXRequest = browserActionApi.handleCRXRequest.bind(browserActionApi);
+    browserActionApi.handleCRXRequest = async request => {
+      const response = await handleCRXRequest(request);
+      if (response.status !== 400) return response;
+      try {
+        const requestUrl = new URL(request.url);
+        if (requestUrl.hostname !== 'extension-icon') return response;
+        const extensionId = requestUrl.pathname.split('/').filter(Boolean)[0];
+        if (!(ses.extensions || ses).getExtension(extensionId)) return response;
+        return new Response(fallbackExtensionIcon, { status: 200, headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' } });
+      } catch (_) { return response; }
+    };
+  }
   ElectronChromeExtensions.handleCRXProtocol(ses);
   // The toolbar lives in the app window's default session; extension data lives in persist:bolt.
   ElectronChromeExtensions.handleCRXProtocol(session.defaultSession);
