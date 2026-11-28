@@ -7,6 +7,7 @@ This project is actively developed. Entries describe repository changes and do n
 ## Unreleased
 
 ### Added
+- **Built-in Bolt pages:** added `bolt://history`, `bolt://privacy` and `bolt://help`, plus `bolt://quit` to close the desktop application. History is stored locally, limited to the latest 500 visits, and excludes incognito tabs.
 - **Isolated workspace storage:** each named workspace now uses its own persistent Chromium session partition. Cookies, local storage, cache and other site data are separated between workspaces. The Personal workspace retains the existing `persist:bolt` data partition.
 - **Incognito tabs:** open a private tab from the toolbar or the three-dots menu. Each private tab uses a non-persistent in-memory Electron session.
 - **Private-tab indicators:** incognito tabs are visibly marked in the tab strip.
@@ -15,6 +16,10 @@ This project is actively developed. Entries describe repository changes and do n
 - **Refreshed mobile PWA start page:** redesigned `mobile/index.html` with a modern dark interface, lime accent styling, responsive mobile-first layout, live clock/date and time-based greeting.
 - **Updated mobile navigation and shortcuts:** added a polished search/address field, quick-access website tiles and a slide-up menu for common actions.
 - **Improved saved-page and install presentation:** added a dedicated saved-pages panel and clearer PWA installation affordance while retaining the existing manifest and service-worker integration.
+
+### Fixed
+- **Workspace creation and restoration:** corrected over-escaped workspace-name validation so ordinary names are accepted consistently when creating, loading, restoring and importing workspaces.
+- **Reader mode:** replaced the page-wide recoloring-only behavior with main-content detection and focused reading styles. Unrelated page sections are hidden while article text and relevant images remain visible.
 
 ### Security and privacy notes
 - Incognito sessions do not persist cookies, site storage or cache after the private tab is closed. Incognito does not make a user anonymous to websites, employers, schools, internet providers or network operators.
