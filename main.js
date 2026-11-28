@@ -38,7 +38,7 @@ let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 const sessionPath = () => path.join(app.getPath('userData'), 'session.json');
-function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; workspaces = Array.isArray(saved.workspaces) ? [...new Set(saved.workspaces.filter(name => typeof name === 'string' && /^[\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal']; if (!workspaces.length) workspaces = ['Personal']; activeWorkspace = workspaces.includes(saved.activeWorkspace) ? saved.activeWorkspace : workspaces[0]; historyEntries = Array.isArray(saved.history) ? saved.history.filter(entry => entry && typeof entry.url === 'string' && /^https?:\\/\\//i.test(entry.url)).slice(-500) : []; } catch (_) {} }
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; workspaces = Array.isArray(saved.workspaces) ? [...new Set(saved.workspaces.filter(name => typeof name === 'string' && /^[\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal']; if (!workspaces.length) workspaces = ['Personal']; activeWorkspace = workspaces.includes(saved.activeWorkspace) ? saved.activeWorkspace : workspaces[0]; historyEntries = Array.isArray(saved.history) ? saved.history.filter(entry => entry && typeof entry.url === 'string' && (entry.url.startsWith('http://') || entry.url.startsWith('https://'))).slice(-500) : []; } catch (_) {} }
 function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, siteOverrides, shieldEnabled, uiSettings, workspaces, activeWorkspace, history: historyEntries }, null, 2), 'utf8'); }
 function isChromeWebStoreRequest(details) {
   try {
@@ -210,7 +210,6 @@ function sessionSafeUrl(webContents) {
       const file = path.basename(decodeURIComponent(parsed.pathname)).toLowerCase();
       if (file === 'newtab.html') return 'bolt://newtab';
       if (file === 'extensions.html') return 'bolt://extensions';
-      if (file === 'internal.html') return 'bolt://' + (parsed.searchParams.get('page') || 'help');
       if (file === 'internal.html') return 'bolt://' + (parsed.searchParams.get('page') || 'help');
       return null;
     }
@@ -630,9 +629,12 @@ function isAppUiSender(event) {
   try {
     if (!event?.sender || !event?.senderFrame || event.senderFrame !== event.sender.mainFrame) return false;
     const senderUrl = new URL(event.senderFrame.url);
-    if (senderUrl.protocol !== 'file:' || senderUrl.search || senderUrl.hash) return false;
+    if (senderUrl.protocol !== 'file:' || senderUrl.hash) return false;
     const allowedFiles = new Set(['index.html', 'newtab.html', 'extensions.html', 'internal.html']);
-    const senderPath = path.resolve(fileURLToPath(senderUrl));
+    const senderFile = path.basename(decodeURIComponent(senderUrl.pathname)).toLowerCase();
+    if (senderUrl.search && (senderFile !== 'internal.html' || !['history', 'privacy', 'help'].includes(senderUrl.searchParams.get('page')))) return false;
+    const cleanSenderUrl = new URL(senderUrl.href); cleanSenderUrl.search = '';
+    const senderPath = path.resolve(fileURLToPath(cleanSenderUrl));
     const expectedPath = path.resolve(path.join(__dirname, path.basename(senderPath)));
     if (!allowedFiles.has(path.basename(senderPath)) || senderPath !== expectedPath) return false;
     const isBrowserUi = win && !win.isDestroyed() && event.sender === win.webContents;
