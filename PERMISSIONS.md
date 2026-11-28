@@ -13,7 +13,7 @@ Bolt uses the persistent `persist:bolt` Electron session. The handlers live in `
 - WebXR VR/AR, hand tracking, NFC, accelerometer/gyroscope/magnetometer, pointer lock, keyboard lock, notifications, MIDI, local fonts, screen enumeration, and media-key-system requests are covered by master switches and request prompts when Chromium emits those permission requests.
 - HTML fullscreen hides Bolt's browser chrome. Native BrowserWindow fullscreen does the same.
 - Popups are allowed as child windows (with bounded dimensions and the same persistent session) so OAuth flows retain a real opener. They remain subject to Chromium's popup-blocking/user-activation rules.
-- The `bolt://` scheme is registered before app readiness and resolves only the bundled `newtab.html` and `extensions.html` pages.
+- The `bolt://` scheme is registered before app readiness and resolves the bundled `newtab.html`, `extensions.html` and internal history, privacy and help pages. `bolt://quit` closes the desktop application.
 - Downloads continue to use the session's `will-download` event. Each download receives its own ID so concurrent downloads do not overwrite each other's UI updates.
 
 ## Location on Windows
