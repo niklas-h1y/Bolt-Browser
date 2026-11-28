@@ -726,7 +726,18 @@ ipcMain.handle('tab:navigate', (_e, input) => {
 });
 ipcMain.handle('tab:back', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); });
 ipcMain.handle('tab:forward', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc?.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); });
-ipcMain.handle('tab:reload', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return tabs.get(activeTabId)?.view.webContents.reload(); });
+ipcMain.handle('tab:reload', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  const item = tabs.get(activeTabId);
+  if (!item) return;
+  if (item.crashedUrl && /^https?:\/\//i.test(item.crashedUrl)) {
+    const target = item.crashedUrl;
+    item.crashedUrl = null;
+    item.crashPage = false;
+    return item.view.webContents.loadURL(target);
+  }
+  return item.view.webContents.reload();
+});
 ipcMain.handle('tab:recover', event => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
   const item = [...tabs.values()].find(entry => entry.view.webContents === event.sender);
