@@ -18,6 +18,7 @@ This project is actively developed. Entries describe repository changes and do n
 - **Improved saved-page and install presentation:** added a dedicated saved-pages panel and clearer PWA installation affordance while retaining the existing manifest and service-worker integration.
 
 ### Fixed
+- **Extension context-menu session mismatch:** only pass Personal-workspace WebContents using the extension manager's configured browser session to `ElectronChromeExtensions`; isolated workspace and private tabs now safely skip extension context-menu and tab-selection calls, preventing an uncaught main-process exception.
 - **Tab context-menu and workspace dialog stability:** replaced the shared native HTML dialog API with a serialized in-app overlay, preventing right-click tab grouping and workspace creation from invoking an unstable dialog path. Workspace creation now initializes its isolated session explicitly and rolls back cleanly if setup fails.
 - **Chrome Web Store navigation:** explicitly preserves official `https://chromewebstore.google.com/` address-bar URLs as ordinary HTTPS navigation targets, bypassing internal-page handling.
 - **Workspace creation and restoration:** corrected over-escaped workspace-name validation so ordinary names are accepted consistently when creating, loading, restoring and importing workspaces.
