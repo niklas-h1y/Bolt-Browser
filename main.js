@@ -371,7 +371,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
     }
   });
   win.contentView.addChildView(view);
-  const item = { view, group: '', workspace: tabWorkspace, incognito, tabSession, lastUrl: /^https?:\\/\\//i.test(String(url)) ? String(url) : '', crashedUrl: null, crashPage: false };
+  const item = { view, group: '', workspace: tabWorkspace, incognito, tabSession, lastUrl: /^https?:\/\//i.test(String(url)) ? String(url) : '', crashedUrl: null, crashPage: false };
   if (incognito) item.permissionManager = configurePermissions({ ses: tabSession, getWindow: () => win, getSettings: () => permissionSettings, getSiteOverrides: () => siteOverrides });
   else item.permissionManager = workspacePermissionManagers.get(workspacePartition(activeWorkspace)) || permissionManager;
   tabs.set(id, item);
@@ -436,7 +436,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
   });
   wc.on('did-navigate', (_event, navigatedUrl) => {
     item.readerCssKey = null;
-    if (/^https?:\\/\\//i.test(String(navigatedUrl))) { item.lastUrl = navigatedUrl; item.crashPage = false; }
+    if (/^https?:\/\//i.test(String(navigatedUrl))) { item.lastUrl = navigatedUrl; item.crashPage = false; }
     recordHistory(item, navigatedUrl);
     if (id === activeTabId) send('reader-state', false);
     if (id === activeTabId) send('page-state', { id, url: displayUrl(navigatedUrl), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
@@ -457,7 +457,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
   wc.on('render-process-gone', (_event, details) => {
     if (item.crashPage || wc.isDestroyed()) return;
     const currentUrl = wc.getURL();
-    item.crashedUrl = /^https?:\\/\\//i.test(currentUrl) ? currentUrl : item.lastUrl;
+    item.crashedUrl = /^https?:\/\//i.test(currentUrl) ? currentUrl : item.lastUrl;
     item.crashPage = true;
     send('browser-error', { id, message: 'This tab stopped unexpectedly (' + details.reason + ').' });
     wc.loadFile(path.join(__dirname, 'crash.html')).catch(error => console.error('Could not show tab recovery page:', error));
@@ -730,7 +730,7 @@ ipcMain.handle('tab:reload', event => { if (!isAppUiSender(event)) throw new Err
 ipcMain.handle('tab:recover', event => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
   const item = [...tabs.values()].find(entry => entry.view.webContents === event.sender);
-  if (!item || !item.crashedUrl || !/^https?:\\/\\//i.test(item.crashedUrl)) throw new Error('There is no crashed web page to recover.');
+  if (!item || !item.crashedUrl || !/^https?:\/\//i.test(item.crashedUrl)) throw new Error('There is no crashed web page to recover.');
   const target = item.crashedUrl;
   item.crashedUrl = null;
   item.crashPage = false;
