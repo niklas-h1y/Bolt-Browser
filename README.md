@@ -28,6 +28,8 @@ Important compatibility notes:
 
 **Windows (easy install):** Download `Bolt-Browser-Setup-*.exe` from the latest successful [Windows installer workflow](https://github.com/niklas-h1y/Bolt-Browser/actions/workflows/windows.yml), open it, and Bolt Browser will install with desktop and Start Menu shortcuts. No separate Node.js installation is needed. New pushes to `main` and published releases build a fresh setup file automatically. The installer keeps browser data when the app is uninstalled.
 
+**Automatic updates:** Windows desktop builds check GitHub Releases in the background, download published updates automatically, and show a **Restart & install** button in **Menu → About** when an update is ready. Install the latest updater-enabled setup once from the Windows installer workflow; older installations do not contain the updater and need this one-time reinstall. Future versions are delivered without rerunning the setup file. To publish an update, increment `version` in `package.json`, push a matching version tag such as `v1.0.2`, and the tagged-release workflow builds and publishes the installer plus `latest.yml` update metadata. Updates are currently enabled for packaged Windows builds (NSIS); development builds and macOS/Linux are not auto-updated.
+
 For development, install Node.js 20+, then run `npm install` and `npm start`. See `extensions/README.md` for desktop extension instructions.
 
 ## Hosted start page
