@@ -7,6 +7,7 @@ This project is actively developed. Entries describe repository changes and do n
 ## Unreleased
 
 ### Added
+- **Windows automatic updates:** packaged Windows builds check GitHub Releases, download updates in the background and expose a restart-to-install action in About. Added GitHub release publishing for version tags and documented the one-time updater-enabled installer bootstrap.
 - **Built-in Bolt pages:** added `bolt://history`, `bolt://privacy` and `bolt://help`, plus `bolt://quit` to close the desktop application. History is stored locally, limited to the latest 500 visits, and excludes incognito tabs.
 - **Isolated workspace storage:** each named workspace now uses its own persistent Chromium session partition. Cookies, local storage, cache and other site data are separated between workspaces. The Personal workspace retains the existing `persist:bolt` data partition.
 - **Incognito tabs:** open a private tab from the toolbar or the three-dots menu. Each private tab uses a non-persistent in-memory Electron session.
