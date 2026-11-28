@@ -7,6 +7,7 @@ const os = require('node:os');
 const extractZip = require('extract-zip');
 const { configurePermissions, DEFAULTS: DEFAULT_PERMISSION_SETTINGS } = require('./permissions');
 const { ElectronChromeExtensions } = require('electron-chrome-extensions');
+const { autoUpdater } = require('electron-updater');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'bolt', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 // Use an English Chromium locale regardless of the host operating-system language.
@@ -145,6 +146,30 @@ function showWebStoreInstallToast(webContents, message) {
 }
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+function configureAutoUpdates() {
+  // The current public release pipeline publishes Windows NSIS installers to GitHub Releases.
+  // Development builds and unsupported desktop platforms must never contact the updater.
+  if (!app.isPackaged || process.platform !== 'win32') return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.on('checking-for-update', () => send('updates-state', { status: 'checking' }));
+  autoUpdater.on('update-available', info => send('updates-state', { status: 'available', version: info.version }));
+  autoUpdater.on('update-not-available', info => send('updates-state', { status: 'current', version: info.version }));
+  autoUpdater.on('download-progress', progress => send('updates-state', { status: 'downloading', percent: Math.round(progress.percent || 0) }));
+  autoUpdater.on('update-downloaded', info => send('updates-state', { status: 'downloaded', version: info.version }));
+  autoUpdater.on('error', error => {
+    console.warn('Automatic update check failed:', error.message);
+    send('updates-state', { status: 'error', message: error.message });
+  });
+  const check = () => autoUpdater.checkForUpdates().catch(error => {
+    console.warn('Automatic update check failed:', error.message);
+    send('updates-state', { status: 'error', message: error.message });
+  });
+  setTimeout(check, 10000);
+  setInterval(check, 4 * 60 * 60 * 1000);
 }
 
 function publicUiSettings() {
@@ -885,6 +910,18 @@ ipcMain.handle('backup:import', async event => {
 
 ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
 ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
+ipcMain.handle('updates:check', async event => {
+  if (!isAppUiSender(event)) throw new Error('Update access denied.');
+  if (!app.isPackaged || process.platform !== 'win32') return { status: 'unsupported' };
+  try { await autoUpdater.checkForUpdates(); return { status: 'checking' }; }
+  catch (error) { send('updates-state', { status: 'error', message: error.message }); return { status: 'error', message: error.message }; }
+});
+ipcMain.handle('updates:install', event => {
+  if (!isAppUiSender(event)) throw new Error('Update access denied.');
+  if (!app.isPackaged || process.platform !== 'win32') throw new Error('Automatic installation is only available in packaged Windows builds.');
+  autoUpdater.quitAndInstall(false, true);
+  return true;
+});
 ipcMain.handle('app:get-info', event => {
   if (!isExtensionsManagerSender(event)) throw new Error('Application information access denied.');
   return {
@@ -1217,6 +1254,7 @@ app.whenReady().then(async () => {
   try { const components = require('electron').components; if (components?.whenReady) await components.whenReady(); }
   catch (error) { console.warn('Widevine component setup was unavailable:', error.message); }
   createWindow();
+  configureAutoUpdates();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
