@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Bolt Browser</title>
+<style>
+:root{color-scheme:dark;--bg:#111210;--panel:#191b18;--panel2:#222520;--line:#30342d;--text:#f2f4ed;--muted:#92988c;--accent:#b8f36b;--ink:#17200d}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#b8f36b12,transparent 55%),var(--bg);color:var(--text);font:14px/1.6 Inter,system-ui,-apple-system,sans-serif}
+main{width:min(820px,calc(100% - 36px));margin:54px auto;padding-bottom:50px}.brand{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}.mark{width:28px;height:28px;border-radius:9px;background:var(--accent);color:var(--ink);display:grid;place-items:center;font-size:19px}
+h1{font-size:clamp(30px,5vw,42px);letter-spacing:-1.8px;line-height:1.1;margin:28px 0 8px}p.lead{color:var(--muted);margin:0 0 28px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0}.row{display:flex;align-items:center;justify-content:space-between;gap:15px}.item{padding:13px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:15px}.item:last-child{border-bottom:0}.item-main{min-width:0;flex:1}.item a{color:var(--text);text-decoration:none;overflow-wrap:anywhere}.item a:hover{color:var(--accent)}.meta{color:var(--muted);font-size:11px;overflow-wrap:anywhere}.button{border:1px solid var(--line);border-radius:9px;padding:9px 13px;background:var(--panel2);color:var(--text);font:inherit;cursor:pointer}.button.primary{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:750}.button.danger{color:#ffaaaa}.button:disabled{opacity:.5;cursor:default}.empty{padding:28px;text-align:center;color:var(--muted)}.links{display:flex;gap:9px;flex-wrap:wrap}.links a{color:var(--accent);text-decoration:none}.status{color:var(--muted);font-size:12px;min-height:22px}.toggle{display:flex;align-items:center;gap:10px}.toggle input{width:18px;height:18px;accent-color:var(--accent)}code{background:var(--panel2);border:1px solid var(--line);padding:2px 6px;border-radius:6px;color:var(--accent)}
+</style>
+</head>
+<body><main>
+<div class="brand"><span class="mark">ϟ</span> Bolt Browser · Internal page</div>
+<h1 id="title">Bolt Browser</h1><p class="lead" id="lead"></p>
+<section class="card" id="content" aria-live="polite"></section>
+<div class="links"><a href="bolt://newtab">New tab</a><a href="bolt://history">History</a><a href="bolt://privacy">Privacy</a><a href="bolt://help">Help</a><a href="bolt://extensions">Extensions</a></div>
+</main>
+<script>
+const page=new URLSearchParams(location.search).get('page')||'help';
+const $=id=>document.getElementById(id);
+const root=$('content');
+function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node}
+function button(label,handler,cls='button'){const b=el('button',cls,label);b.type='button';b.addEventListener('click',handler);return b}
+function showEmpty(text){root.replaceChildren(el('div','empty',text))}
+function formatDate(value){const date=new Date(value);return Number.isNaN(date.getTime())?'':date.toLocaleString()}
+async function historyPage(){
+ $('title').textContent='Your browsing history';$('lead').textContent='Pages visited in this Bolt Browser profile. Private tabs are never added.';
+ const head=el('div','row');head.append(el('strong','','Recent pages'),button('Clear history',async()=>{if(!confirm('Clear all browsing history stored by Bolt?'))return;try{await window.bolt.clearHistory();render()}catch(e){$('lead').textContent=e.message}},'button danger'));root.replaceChildren(head);
+ async function render(){const entries=await window.bolt.getHistory();root.querySelectorAll('.item,.empty').forEach(n=>n.remove());if(!entries.length){root.append(el('div','empty','No browsing history yet.'));return}for(const entry of entries){const row=el('div','item');const main=el('div','item-main');const a=el('a','',entry.title||entry.url);a.href=entry.url;a.addEventListener('click',e=>{e.preventDefault();window.bolt.navigate(entry.url)});main.append(a,el('div','meta',entry.url),el('div','meta',formatDate(entry.visitedAt)));row.append(main,button('Open',()=>window.bolt.navigate(entry.url)));root.append(row)}}
+ await render();
+}
+async function privacyPage(){
+ $('title').textContent='Privacy & protection';$('lead').textContent='Manage Bolt’s built-in tracker protection and understand what it does.';
+ const state=await window.bolt.getShieldState();const row=el('div','row');const copy=el('div');copy.append(el('strong','','Ad & tracker shield'),el('div','meta','Blocks requests to known advertising and tracking domains. It is not a complete tracker audit.'));const toggle=el('label','toggle');const input=el('input');input.type='checkbox';input.checked=state.enabled;input.addEventListener('change',async()=>{try{const next=await window.bolt.setShieldEnabled(input.checked);count.textContent=String(next.blocked||0);status.textContent=next.enabled?'Shield enabled':'Shield disabled'}catch(e){input.checked=!input.checked;status.textContent=e.message}});toggle.append(input,el('span','','Enabled'));row.append(copy,toggle);root.replaceChildren(row);const stats=el('div','item');stats.append(el('div','item-main','Requests blocked this session'),el('strong','',String(state.blocked||0)));root.append(stats);const count=stats.querySelector('strong');const status=el('p','status','');root.append(status);root.append(el('p','meta','Bolt does not sell browsing history. History is stored locally in the browser profile and can be cleared here. Incognito tabs are excluded.'));
+}
+function helpPage(){
+ $('title').textContent='Bolt Browser help';$('lead').textContent='Quick guide to browser features and built-in pages.';
+ const sections=[
+ ['Internal pages','Type one of these addresses into the address bar:'],
+ ['bolt://newtab','Open the Bolt start page.'],
+ ['bolt://history','View or clear locally stored browsing history.'],
+ ['bolt://privacy','Check tracker protection and privacy information.'],
+ ['bolt://help','Open this help page.'],
+ ['bolt://extensions','Manage installed desktop extensions.'],
+ ['bolt://quit','Close Bolt Browser.'],
+ ['Workspaces','Choose the workspace selector in the toolbar to switch profiles, or select “New workspace…” to create one. Each workspace keeps its own website cookies, local storage and cache.'],
+ ['Reader mode','Open a website and select Reader in the toolbar. Reader view focuses on the main article area and keeps its images. Select Reader again to return to the original page.'],
+ ['Privacy','Incognito tabs are not stored in history or session restore. The tracker shield blocks known ad and tracking domains, but does not make you anonymous.']
+ ];
+ root.replaceChildren(...sections.map(([title,body])=>{const box=el('div','item');const copy=el('div','item-main');copy.append(el('strong','',title),el('div','meta',body));box.append(copy);return box}));
+}
+if(page==='history')historyPage().catch(e=>showEmpty(e.message));
+else if(page==='privacy')privacyPage().catch(e=>showEmpty(e.message));
+else helpPage();
+</script></body></html>
