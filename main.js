@@ -35,6 +35,7 @@ let shieldRequestListener = null;
 let uiSettings = { theme: 'bolt-dark', accent: '#b8f36b', searchEngine: 'google', startup: 'newtab', newTabBackground: 'default', newTabBackgroundImage: '', restoreSession: true };
 let sessionSaveTimer = null;
 let resourceMonitorTimer = null;
+let updateState = { status: 'idle' };
 let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
@@ -148,6 +149,8 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function publishUpdateState(state) { updateState = state; send('updates-state', state); }
+
 function configureAutoUpdates() {
   // The current public release pipeline publishes Windows NSIS installers to GitHub Releases.
   // Development builds and unsupported desktop platforms must never contact the updater.
@@ -155,14 +158,14 @@ function configureAutoUpdates() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = false;
-  autoUpdater.on('checking-for-update', () => send('updates-state', { status: 'checking' }));
-  autoUpdater.on('update-available', info => send('updates-state', { status: 'available', version: info.version }));
-  autoUpdater.on('update-not-available', info => send('updates-state', { status: 'current', version: info.version }));
-  autoUpdater.on('download-progress', progress => send('updates-state', { status: 'downloading', percent: Math.round(progress.percent || 0) }));
-  autoUpdater.on('update-downloaded', info => send('updates-state', { status: 'downloaded', version: info.version }));
+  autoUpdater.on('checking-for-update', () => publishUpdateState({ status: 'checking' }));
+  autoUpdater.on('update-available', info => publishUpdateState({ status: 'available', version: info.version }));
+  autoUpdater.on('update-not-available', info => publishUpdateState({ status: 'current', version: info.version }));
+  autoUpdater.on('download-progress', progress => publishUpdateState({ status: 'downloading', percent: Math.round(progress.percent || 0) }));
+  autoUpdater.on('update-downloaded', info => publishUpdateState({ status: 'downloaded', version: info.version }));
   autoUpdater.on('error', error => {
     console.warn('Automatic update check failed:', error.message);
-    send('updates-state', { status: 'error', message: error.message });
+    publishUpdateState({ status: 'error', message: error.message });
   });
   const check = () => autoUpdater.checkForUpdates().catch(error => {
     console.warn('Automatic update check failed:', error.message);
@@ -910,6 +913,10 @@ ipcMain.handle('backup:import', async event => {
 
 ipcMain.handle('shield:get-state', event => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return { enabled: shieldEnabled, blocked: blockedRequestCount }; });
 ipcMain.handle('shield:set-enabled', (event, enabled) => { if (!isExtensionsManagerSender(event)) throw new Error('Settings access denied.'); return setShieldEnabled(enabled); });
+ipcMain.handle('updates:get-state', event => {
+  if (!isAppUiSender(event)) throw new Error('Update access denied.');
+  return !app.isPackaged || process.platform !== 'win32' ? { status: 'unsupported' } : updateState;
+});
 ipcMain.handle('updates:check', async event => {
   if (!isAppUiSender(event)) throw new Error('Update access denied.');
   if (!app.isPackaged || process.platform !== 'win32') return { status: 'unsupported' };
