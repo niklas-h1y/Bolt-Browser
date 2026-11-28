@@ -20,6 +20,11 @@ This project is actively developed. Entries describe repository changes and do n
 ### Fixed
 - **Workspace creation and restoration:** corrected over-escaped workspace-name validation so ordinary names are accepted consistently when creating, loading, restoring and importing workspaces.
 - **Reader mode:** replaced the page-wide recoloring-only behavior with main-content detection and focused reading styles. Unrelated page sections are hidden while article text and relevant images remain visible.
+- **Unsupported native prompts:** replaced `prompt()` calls in the tab-group context menu, workspace picker and extension installer with in-app dialogs, preventing right-click and related actions from throwing in Electron.
+- **Tab strip overflow:** made tabs a fixed-width horizontal scroller with hidden native scrollbars and moved the New Tab button outside the scrolling region so it remains visible.
+- **Settings markup:** removed literal `\\n` text around the Browser backup section.
+- **Crashed-tab recovery:** when a tab renderer exits unexpectedly, Bolt now loads a recovery page with actions to retry the previous web address or open a new tab. This provides a visible recovery path for Chrome Web Store renderer failures; it does not claim to prevent every underlying Chromium renderer crash.
+- **Missing extension icons:** added a Bolt icon fallback for installed extensions whose toolbar action has no usable icon, avoiding failed `crx://extension-icon` responses.
 
 ### Security and privacy notes
 - Incognito sessions do not persist cookies, site storage or cache after the private tab is closed. Incognito does not make a user anonymous to websites, employers, schools, internet providers or network operators.
