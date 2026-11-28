@@ -312,7 +312,9 @@ function activate(id) {
   activeWorkspace = tabs.get(id).workspace || activeWorkspace;
   layoutViews();
   const wc = tabs.get(id).view.webContents;
-  if (extensionManager && !tabs.get(id).incognito && (tabs.get(id).workspace || 'Personal') === 'Personal') extensionManager.selectTab(wc);
+  if (extensionManager && wc.session === browserSession() && !tabs.get(id).incognito && (tabs.get(id).workspace || 'Personal') === 'Personal') {
+    try { extensionManager.selectTab(wc); } catch (error) { console.warn('Could not select extension tab:', error.message); }
+  }
   send('page-state', { id, url: displayUrl(wc.getURL()), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
   send('reader-state', Boolean(tabs.get(id).readerCssKey));
   send('incognito-state', Boolean(tabs.get(id).incognito));
@@ -378,7 +380,9 @@ function createTab(url = 'bolt://newtab', options = {}) {
   else item.permissionManager = workspacePermissionManagers.get(workspacePartition(activeWorkspace)) || permissionManager;
   tabs.set(id, item);
   const wc = view.webContents;
-  if (!incognito && activeWorkspace === 'Personal' && extensionManager && win && !win.isDestroyed()) extensionManager.addTab(wc, win);
+  if (!incognito && tabWorkspace === 'Personal' && tabSession === browserSession() && extensionManager && win && !win.isDestroyed()) {
+    try { extensionManager.addTab(wc, win); } catch (error) { console.warn('Could not register extension tab:', error.message); }
+  }
   // Keep the session and each embedded page on the same Chrome-like UA.
   wc.setUserAgent(cleanChromeUserAgent(tabSession.getUserAgent()));
   wc.on('ipc-message', async (event, channel, extensionId) => {
@@ -406,8 +410,15 @@ function createTab(url = 'bolt://newtab', options = {}) {
   const tabPermissionManager = item.permissionManager || permissionManager;
   if (tabPermissionManager) tabPermissionManager.attachWebContents(wc);
   wc.on('context-menu', (_event, params) => {
-    const items = extensionManager?.getContextMenuItems(wc, params) || [];
-    if (items.length) Menu.buildFromTemplate(items).popup({ window: win, x: params.x, y: params.y });
+    // ElectronChromeExtensions only accepts WebContents created with its configured session.
+    // Workspace and private tabs use isolated sessions, so never pass them to its APIs.
+    if (!extensionManager || incognito || tabWorkspace !== 'Personal' || tabSession !== browserSession() || wc.isDestroyed()) return;
+    try {
+      const items = extensionManager.getContextMenuItems(wc, params) || [];
+      if (items.length && win && !win.isDestroyed()) Menu.buildFromTemplate(items).popup({ window: win, x: params.x, y: params.y });
+    } catch (error) {
+      console.warn('Could not build extension context menu:', error.message);
+    }
   });
   wc.on('did-create-window', childWindow => { if (childWindow?.webContents) { attachDevToolsShortcut(childWindow.webContents); if (tabPermissionManager) tabPermissionManager.attachWebContents(childWindow.webContents); } });
   wc.setWindowOpenHandler(({ url, features }) => {
