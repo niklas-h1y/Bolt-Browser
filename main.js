@@ -19,6 +19,7 @@ let tabs = new Map();
 let activeTabId = null;
 let workspaces = ['Personal'];
 let activeWorkspace = 'Personal';
+let historyEntries = [];
 let overlayOpen = false;
 let extensionPopupWindows = new Map();
 let nextTabId = 1;
@@ -37,8 +38,8 @@ let isRestoringSession = false;
 let pendingProtocolUrl = process.argv.find(arg => /^bolt:\/\//i.test(arg)) || null;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 const sessionPath = () => path.join(app.getPath('userData'), 'session.json');
-function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; workspaces = Array.isArray(saved.workspaces) ? [...new Set(saved.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal']; if (!workspaces.length) workspaces = ['Personal']; activeWorkspace = workspaces.includes(saved.activeWorkspace) ? saved.activeWorkspace : workspaces[0]; } catch (_) {} }
-function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, siteOverrides, shieldEnabled, uiSettings, workspaces, activeWorkspace }, null, 2), 'utf8'); }
+function loadSettings() { try { const saved = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); permissionSettings = { ...DEFAULT_PERMISSION_SETTINGS, ...(saved.permissions || {}) }; siteOverrides = saved.siteOverrides && typeof saved.siteOverrides === 'object' && !Array.isArray(saved.siteOverrides) ? saved.siteOverrides : {}; shieldEnabled = saved.shieldEnabled !== false; uiSettings = { ...uiSettings, ...(saved.uiSettings || {}) }; workspaces = Array.isArray(saved.workspaces) ? [...new Set(saved.workspaces.filter(name => typeof name === 'string' && /^[\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal']; if (!workspaces.length) workspaces = ['Personal']; activeWorkspace = workspaces.includes(saved.activeWorkspace) ? saved.activeWorkspace : workspaces[0]; historyEntries = Array.isArray(saved.history) ? saved.history.filter(entry => entry && typeof entry.url === 'string' && /^https?:\\/\\//i.test(entry.url)).slice(-500) : []; } catch (_) {} }
+function saveSettings() { fs.mkdirSync(path.dirname(settingsPath()), { recursive: true }); fs.writeFileSync(settingsPath(), JSON.stringify({ permissions: permissionSettings, siteOverrides, shieldEnabled, uiSettings, workspaces, activeWorkspace, history: historyEntries }, null, 2), 'utf8'); }
 function isChromeWebStoreRequest(details) {
   try {
     const requestUrl = new URL(details.url);
@@ -169,7 +170,8 @@ function publishUiSettings() {
 function handleExternalProtocol(rawUrl) {
   try {
     const parsed = new URL(rawUrl);
-    if (parsed.protocol !== 'bolt:' || !['newtab', 'extensions'].includes(parsed.hostname)) return false;
+    if (parsed.protocol !== 'bolt:' || !['newtab', 'extensions', 'history', 'privacy', 'help', 'quit'].includes(parsed.hostname)) return false;
+    if (parsed.hostname === 'quit') { app.quit(); return true; }
     if (win && !win.isDestroyed()) createTab(rawUrl); else pendingProtocolUrl = rawUrl;
     return true;
   } catch (_) { return false; }
@@ -195,6 +197,7 @@ function displayUrl(rawUrl) {
       const page = path.basename(decodeURIComponent(parsed.pathname)).toLowerCase();
       if (page === 'newtab.html') return '';
       if (page === 'extensions.html') return 'bolt://extensions';
+      if (page === 'internal.html') return 'bolt://' + (new URL(value).searchParams.get('page') || 'help');
     }
   } catch (_) {}
   return value;
@@ -207,6 +210,8 @@ function sessionSafeUrl(webContents) {
       const file = path.basename(decodeURIComponent(parsed.pathname)).toLowerCase();
       if (file === 'newtab.html') return 'bolt://newtab';
       if (file === 'extensions.html') return 'bolt://extensions';
+      if (file === 'internal.html') return 'bolt://' + (parsed.searchParams.get('page') || 'help');
+      if (file === 'internal.html') return 'bolt://' + (parsed.searchParams.get('page') || 'help');
       return null;
     }
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
@@ -214,7 +219,7 @@ function sessionSafeUrl(webContents) {
       parsed.password = '';
       return parsed.toString();
     }
-    if (parsed.protocol === 'bolt:' && ['newtab', 'extensions'].includes(parsed.hostname)) return parsed.toString();
+    if (parsed.protocol === 'bolt:' && ['newtab', 'extensions', 'history', 'privacy', 'help'].includes(parsed.hostname)) return parsed.toString();
   } catch (_) {}
   return null;
 }
@@ -253,10 +258,10 @@ function restoreSession() {
       try {
         const parsed = new URL(url);
         valid = ['http:', 'https:'].includes(parsed.protocol)
-          || (parsed.protocol === 'bolt:' && ['newtab', 'extensions'].includes(parsed.hostname));
+          || (parsed.protocol === 'bolt:' && ['newtab', 'extensions', 'history', 'privacy', 'help'].includes(parsed.hostname));
       } catch (_) {}
       if (!valid) url = 'bolt://newtab';
-      const entryWorkspace = typeof entry.workspace === 'string' && /^[\\w -]{1,24}$/.test(entry.workspace) ? entry.workspace : 'Personal';
+      const entryWorkspace = typeof entry.workspace === 'string' && /^[\w -]{1,24}$/.test(entry.workspace) ? entry.workspace : 'Personal';
       if (!workspaces.includes(entryWorkspace) && workspaces.length < 12) workspaces.push(entryWorkspace);
       const id = createTab(url, { workspace: entryWorkspace });
       const item = tabs.get(id);
@@ -270,6 +275,19 @@ function restoreSession() {
   } finally { isRestoringSession = false; }
   publishTabs();
   scheduleSessionSave();
+}
+function recordHistory(item, url) {
+  if (!item || item.incognito || typeof url !== 'string') return;
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return;
+    parsed.username = '';
+    parsed.password = '';
+    const safeUrl = parsed.toString();
+    historyEntries.push({ url: safeUrl, title: item.view.webContents.getTitle() || safeUrl, visitedAt: Date.now() });
+    historyEntries = historyEntries.slice(-500);
+    saveSettings();
+  } catch (_) {}
 }
 function snapshot() {
   return [...tabs.entries()].filter(([, item]) => (item.workspace || 'Personal') === activeWorkspace).map(([id, item]) => ({
@@ -307,13 +325,16 @@ function internalPageForUrl(value) {
   const page = match[1].toLowerCase();
   if (page === 'extensions') return 'extensions';
   if (page === 'newtab') return 'newtab';
+  if (['history', 'privacy', 'help', 'quit'].includes(page)) return page;
   return 'unsupported';
 }
 function isExtensionsUrl(value) { return internalPageForUrl(value) === 'extensions'; }
 function loadInternalPage(webContents, page) {
   if (!webContents || webContents.isDestroyed()) return;
-  const file = page === 'extensions' ? 'extensions.html' : page === 'newtab' ? 'newtab.html' : null;
-  if (file) webContents.loadFile(path.join(__dirname, file));
+  if (page === 'quit') { app.quit(); return; }
+  const file = page === 'extensions' ? 'extensions.html' : page === 'newtab' ? 'newtab.html' : ['history', 'privacy', 'help'].includes(page) ? 'internal.html' : null;
+  if (file === 'internal.html') webContents.loadFile(path.join(__dirname, file), { query: { page } });
+  else if (file) webContents.loadFile(path.join(__dirname, file));
   else webContents.executeJavaScript(`document.body.innerHTML = '<main style="font:16px system-ui;padding:40px;color:#ddd;background:#10131b"><h1>Page not available</h1><p>This Chrome internal page is not implemented in Bolt Browser.</p><p>Try <code>chrome://extensions</code> to manage extensions.</p></main>'`).catch(() => {});
 }
 function openExtensionsPage(webContents) { loadInternalPage(webContents, 'extensions'); }
@@ -323,6 +344,7 @@ function navigateTo(input) {
   const internalPage = internalPageForUrl(value);
   if (internalPage === 'extensions') return 'bolt://extensions';
   if (internalPage === 'newtab') return 'bolt://newtab';
+  if (internalPage && internalPage !== 'unsupported') return 'bolt://' + internalPage;
   if (internalPage === 'unsupported') return '';
   if (/^(https?:|file:|about:)/i.test(value)) return value;
   if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value) || /^localhost(:\d+)?/.test(value)) return 'https://' + value;
@@ -389,7 +411,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
   wc.setWindowOpenHandler(({ url, features }) => {
     const internalPage = internalPageForUrl(url);
     if (internalPage) {
-      createTab(url);
+      if (internalPage === 'quit') app.quit(); else createTab(url);
       return { action: 'deny' };
     }
     let target;
@@ -414,6 +436,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
   });
   wc.on('did-navigate', (_event, navigatedUrl) => {
     item.readerCssKey = null;
+    recordHistory(item, navigatedUrl);
     if (id === activeTabId) send('reader-state', false);
     if (id === activeTabId) send('page-state', { id, url: displayUrl(navigatedUrl), title: wc.getTitle() || 'New tab', canGoBack: wc.navigationHistory.canGoBack(), canGoForward: wc.navigationHistory.canGoForward() });
     publishTabs();
@@ -608,7 +631,7 @@ function isAppUiSender(event) {
     if (!event?.sender || !event?.senderFrame || event.senderFrame !== event.sender.mainFrame) return false;
     const senderUrl = new URL(event.senderFrame.url);
     if (senderUrl.protocol !== 'file:' || senderUrl.search || senderUrl.hash) return false;
-    const allowedFiles = new Set(['index.html', 'newtab.html', 'extensions.html']);
+    const allowedFiles = new Set(['index.html', 'newtab.html', 'extensions.html', 'internal.html']);
     const senderPath = path.resolve(fileURLToPath(senderUrl));
     const expectedPath = path.resolve(path.join(__dirname, path.basename(senderPath)));
     if (!allowedFiles.has(path.basename(senderPath)) || senderPath !== expectedPath) return false;
@@ -623,6 +646,16 @@ function isExtensionsManagerSender(event) {
   return isAppUiSender(event);
 }
 
+ipcMain.handle('history:list', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  return [...historyEntries].reverse();
+});
+ipcMain.handle('history:clear', event => {
+  if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
+  historyEntries = [];
+  saveSettings();
+  return true;
+});
 ipcMain.handle('tab:overlay', (_e, isOpen) => {
   if (!isAppUiSender(_e)) throw new Error('Browser UI access denied.');
   overlayOpen = Boolean(isOpen);
@@ -637,7 +670,7 @@ ipcMain.handle('workspace:list', event => {
 });
 ipcMain.handle('workspace:create', (event, name) => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
-  if (typeof name !== 'string' || !/^[\\w -]{1,24}$/.test(name.trim())) throw new Error('Workspace names must be 1–24 letters, numbers, spaces, _ or -.');
+  if (typeof name !== 'string' || !/^[\w -]{1,24}$/.test(name.trim())) throw new Error('Workspace names must be 1–24 letters, numbers, spaces, _ or -.');
   const clean = name.trim();
   if (workspaces.includes(clean)) { activeWorkspace = clean; } else {
     if (workspaces.length >= 12) throw new Error('You can create up to 12 workspaces.');
@@ -674,7 +707,8 @@ ipcMain.handle('tab:navigate', (_e, input) => {
   const item = tabs.get(activeTabId);
   if (!item) return;
   const page = internalPageForUrl(input);
-  if (page === 'extensions' || page === 'newtab') loadInternalPage(item.view.webContents, page);
+  if (page === 'quit') app.quit();
+  else if (page && page !== 'unsupported') loadInternalPage(item.view.webContents, page);
   else if (page === 'unsupported') loadInternalPage(item.view.webContents, 'unsupported');
   else item.view.webContents.loadURL(navigateTo(input));
 });
@@ -683,6 +717,7 @@ ipcMain.handle('tab:forward', event => { if (!isAppUiSender(event)) throw new Er
 ipcMain.handle('tab:reload', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return tabs.get(activeTabId)?.view.webContents.reload(); });
 ipcMain.handle('tab:home', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); const wc = tabs.get(activeTabId)?.view.webContents; if (wc) wc.loadFile(path.join(__dirname, 'newtab.html')); });
 ipcMain.handle('download:open-folder', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); return shell.openPath(app.getPath('downloads')); });
+ipcMain.handle('app:quit', event => { if (!isAppUiSender(event)) throw new Error('Browser UI access denied.'); app.quit(); return true; });
 ipcMain.handle('reader:toggle', async event => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
   const item = tabs.get(activeTabId);
@@ -690,24 +725,20 @@ ipcMain.handle('reader:toggle', async event => {
   const wc = item.view.webContents;
   if (item.readerCssKey) {
     try { await wc.removeInsertedCSS(item.readerCssKey); } catch (_) {}
+    try { await wc.executeJavaScript("document.querySelectorAll('[data-bolt-reader-hidden],[data-bolt-reader-content]').forEach(el=>el.removeAttribute('data-bolt-reader-hidden')||el.removeAttribute('data-bolt-reader-content'));document.documentElement.removeAttribute('data-bolt-reader');document.body?.removeAttribute('data-bolt-reader');"); } catch (_) {}
     item.readerCssKey = null;
     send('reader-state', false);
     return false;
   }
-  const css = `
-    html { background: #f5f0e6 !important; color: #24231f !important; }
-    body { background: #f5f0e6 !important; color: #24231f !important; font-family: Georgia, 'Times New Roman', serif !important; font-size: 19px !important; line-height: 1.75 !important; }
-    nav, header, footer, aside, [role="navigation"], [role="banner"], [role="complementary"],
-    [aria-label*="advert" i], [id*="advert" i], [class*="advert" i], [id*="cookie" i], [class*="cookie" i],
-    [id*="popup" i], [class*="popup" i], [id*="modal" i], [class*="modal" i] { display: none !important; }
-    article, main, [role="main"] { max-width: 820px !important; margin: 32px auto !important; padding: 32px !important; background: #fffdf8 !important; color: #24231f !important; box-shadow: 0 8px 40px #0001 !important; }
-    p, li { max-width: 72ch !important; }
-    img, video { max-width: 100% !important; height: auto !important; }
-    a { color: #245c8a !important; }
-  `;
-  item.readerCssKey = await wc.insertCSS(css);
-  send('reader-state', true);
-  return true;
+  try {
+    await wc.executeJavaScript("(() => {\n  const visible = el => {\n    const style = getComputedStyle(el);\n    const rect = el.getBoundingClientRect();\n    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;\n  };\n  const candidates = [...document.querySelectorAll('article, main, [role=\"main\"], [itemprop=\"articleBody\"], section, div')]\n    .filter(el => visible(el) && (el.innerText || '').trim().length >= 240);\n  const score = el => {\n    const text = (el.innerText || '').trim();\n    const paragraphs = el.querySelectorAll('p').length;\n    const headings = el.querySelectorAll('h1,h2,h3').length;\n    const images = el.querySelectorAll('img,figure').length;\n    const links = [...el.querySelectorAll('a')].reduce((n,a)=>n+(a.innerText||'').length,0);\n    const density = text.length ? Math.min(1, links / text.length) : 1;\n    return Math.min(text.length, 12000) + paragraphs * 180 + headings * 90 + images * 45 - density * text.length * 0.65;\n  };\n  candidates.sort((a,b)=>score(b)-score(a));\n  const content = candidates[0] || document.body;\n  let branch = content;\n  while (branch && branch.parentElement && branch.parentElement !== document.body) {\n    for (const sibling of branch.parentElement.children) if (sibling !== branch) sibling.setAttribute('data-bolt-reader-hidden','');\n    branch = branch.parentElement;\n  }\n  if (branch && branch.parentElement === document.body) {\n    for (const sibling of document.body.children) if (sibling !== branch) sibling.setAttribute('data-bolt-reader-hidden','');\n  }\n  content.setAttribute('data-bolt-reader-content','');\n  content.querySelectorAll('nav,aside,footer,[role=\"navigation\"],[role=\"complementary\"],[aria-label*=\"advert\" i],[id*=\"advert\" i],[class*=\"advert\" i],[id*=\"cookie\" i],[class*=\"cookie\" i],[id*=\"popup\" i],[class*=\"popup\" i],[id*=\"modal\" i],[class*=\"modal\" i]').forEach(el=>el.setAttribute('data-bolt-reader-hidden',''));\n  document.documentElement.setAttribute('data-bolt-reader','true');\n  document.body.setAttribute('data-bolt-reader','true');\n  return true;\n})()");
+    item.readerCssKey = await wc.insertCSS("html[data-bolt-reader=\"true\"], body[data-bolt-reader=\"true\"] { background:#f5f0e6 !important; color:#24231f !important; }\\nbody[data-bolt-reader=\"true\"] { margin:0 !important; font-family:Georgia,\"Times New Roman\",serif !important; font-size:19px !important; line-height:1.8 !important; }\\n[data-bolt-reader-hidden] { display:none !important; }\\n[data-bolt-reader-content] { display:block !important; width:calc(100% - 32px) !important; max-width:760px !important; margin:36px auto !important; padding:clamp(20px,4vw,48px) !important; box-sizing:border-box !important; background:#fffdf8 !important; color:#24231f !important; font-family:Georgia,\"Times New Roman\",serif !important; font-size:19px !important; line-height:1.8 !important; box-shadow:0 8px 40px #0001 !important; }\\n[data-bolt-reader-content] h1,[data-bolt-reader-content] h2,[data-bolt-reader-content] h3 { color:#1e211c !important; line-height:1.25 !important; }\\n[data-bolt-reader-content] p,[data-bolt-reader-content] li,[data-bolt-reader-content] blockquote { max-width:72ch !important; color:#302f29 !important; }\\n[data-bolt-reader-content] img,[data-bolt-reader-content] video,[data-bolt-reader-content] svg { max-width:100% !important; height:auto !important; }\\n[data-bolt-reader-content] figure { margin:1.5em 0 !important; text-align:center !important; }\\n[data-bolt-reader-content] a { color:#245c8a !important; }");
+    send('reader-state', true);
+    return true;
+  } catch (error) {
+    item.readerCssKey = null;
+    throw new Error('Could not prepare reader view: ' + error.message);
+  }
 });
 ipcMain.handle('resource:get-stats', event => {
   if (!isAppUiSender(event)) throw new Error('Browser UI access denied.');
@@ -771,13 +802,13 @@ ipcMain.handle('backup:import', async event => {
   shieldEnabled = backup.shieldEnabled !== false;
   blockedRequestCount = 0;
   send('shield-state', { enabled: shieldEnabled, blocked: blockedRequestCount });
-  workspaces = Array.isArray(backup.workspaces) ? [...new Set(backup.workspaces.filter(name => typeof name === 'string' && /^[\\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal'];
+  workspaces = Array.isArray(backup.workspaces) ? [...new Set(backup.workspaces.filter(name => typeof name === 'string' && /^[\w -]{1,24}$/.test(name)))].slice(0, 12) : ['Personal'];
   if (!workspaces.length) workspaces = ['Personal'];
   if (!workspaces.includes('Personal') && workspaces.length < 12) workspaces.unshift('Personal');
   activeWorkspace = workspaces.includes(backup.activeWorkspace) ? backup.activeWorkspace : workspaces[0];
   const incomingTabs = Array.isArray(backup.tabs) ? backup.tabs.slice(0, 50).map(entry => {
     let url = typeof entry?.url === 'string' ? entry.url : 'bolt://newtab';
-    try { const parsed = new URL(url); if (!(['http:', 'https:'].includes(parsed.protocol) || (parsed.protocol === 'bolt:' && ['newtab','extensions'].includes(parsed.hostname)))) url = 'bolt://newtab'; } catch (_) { url = 'bolt://newtab'; }
+    try { const parsed = new URL(url); if (!(['http:', 'https:'].includes(parsed.protocol) || (parsed.protocol === 'bolt:' && ['newtab','extensions','history','privacy','help'].includes(parsed.hostname)))) url = 'bolt://newtab'; } catch (_) { url = 'bolt://newtab'; }
     const workspace = typeof entry?.workspace === 'string' && workspaces.includes(entry.workspace) ? entry.workspace : 'Personal';
     return { url, group: typeof entry?.group === 'string' ? entry.group.slice(0, 24) : '', workspace };
   }) : [];
@@ -1088,9 +1119,11 @@ app.whenReady().then(async () => {
   }
   protocol.handle('bolt', request => {
     const host = new URL(request.url).hostname;
-    const file = host === 'newtab' ? 'newtab.html' : host === 'extensions' ? 'extensions.html' : null;
+    if (host === 'quit') { app.quit(); return new Response('Bolt Browser is closing.', { status: 200 }); }
+    const file = host === 'newtab' ? 'newtab.html' : host === 'extensions' ? 'extensions.html' : ['history', 'privacy', 'help'].includes(host) ? 'internal.html' : null;
     if (!file) return new Response('Unknown Bolt internal page', { status: 404 });
-    return net.fetch(pathToFileURL(path.join(__dirname, file)).toString());
+    const target = pathToFileURL(path.join(__dirname, file)).toString() + (file === 'internal.html' ? '?page=' + encodeURIComponent(host) : '');
+    return net.fetch(target);
   });
   ses.on('will-download', (_event, item) => {
     const filename = item.getFilename();
