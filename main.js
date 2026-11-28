@@ -458,6 +458,7 @@ function createTab(url = 'bolt://newtab', options = {}) {
     const override = extensionManager?.getURLOverrides().newtab;
     if (override) wc.loadURL(override); else loadInternalPage(wc, 'newtab');
   }
+  else if (['history', 'privacy', 'help', 'quit'].includes(internalPageForUrl(url))) loadInternalPage(wc, internalPageForUrl(url));
   else if (internalPageForUrl(url) === 'extensions') openExtensionsPage(wc);
   else if (internalPageForUrl(url) === 'unsupported') loadInternalPage(wc, 'unsupported');
   else wc.loadURL(navigateTo(url));
@@ -727,7 +728,7 @@ ipcMain.handle('reader:toggle', async event => {
   const wc = item.view.webContents;
   if (item.readerCssKey) {
     try { await wc.removeInsertedCSS(item.readerCssKey); } catch (_) {}
-    try { await wc.executeJavaScript("document.querySelectorAll('[data-bolt-reader-hidden],[data-bolt-reader-content]').forEach(el=>el.removeAttribute('data-bolt-reader-hidden')||el.removeAttribute('data-bolt-reader-content'));document.documentElement.removeAttribute('data-bolt-reader');document.body?.removeAttribute('data-bolt-reader');"); } catch (_) {}
+    try { await wc.executeJavaScript("document.querySelectorAll('[data-bolt-reader-hidden],[data-bolt-reader-content]').forEach(el=>{el.removeAttribute('data-bolt-reader-hidden');el.removeAttribute('data-bolt-reader-content')});document.documentElement.removeAttribute('data-bolt-reader');document.body?.removeAttribute('data-bolt-reader');"); } catch (_) {}
     item.readerCssKey = null;
     send('reader-state', false);
     return false;
